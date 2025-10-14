@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "../lib/api";
 import { Button } from "./ui/Button";
 import { Badge } from "./ui/Badge";
@@ -8,6 +8,7 @@ interface PortForwardModalProps {
   resourceType: string;
   resourceName: string;
   namespace: string;
+  availablePorts?: number[];
   onClose: () => void;
 }
 
@@ -15,6 +16,7 @@ export function PortForwardModal({
   resourceType,
   resourceName,
   namespace,
+  availablePorts = [],
   onClose,
 }: PortForwardModalProps) {
   const [localPort, setLocalPort] = useState<string>("");
@@ -22,6 +24,15 @@ export function PortForwardModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Auto-populate with first available port
+  useEffect(() => {
+    if (availablePorts.length > 0 && !remotePort) {
+      const firstPort = availablePorts[0].toString();
+      setRemotePort(firstPort);
+      setLocalPort(firstPort);
+    }
+  }, [availablePorts]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,6 +81,28 @@ export function PortForwardModal({
 
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          {availablePorts.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-2">Quick Select (Container Ports)</label>
+              <div className="flex flex-wrap gap-2">
+                {availablePorts.map((port) => (
+                  <Button
+                    key={port}
+                    type="button"
+                    variant={remotePort === port.toString() ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setRemotePort(port.toString());
+                      setLocalPort(port.toString());
+                    }}
+                  >
+                    {port}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-4">
             <div className="flex-1">
               <label className="block text-sm font-medium mb-2">Local Port</label>

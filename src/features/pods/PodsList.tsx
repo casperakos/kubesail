@@ -26,9 +26,10 @@ export function PodsList() {
   const [selectedPodForYaml, setSelectedPodForYaml] = useState<string | null>(
     null
   );
-  const [selectedPodForPortForward, setSelectedPodForPortForward] = useState<string | null>(
-    null
-  );
+  const [selectedPodForPortForward, setSelectedPodForPortForward] = useState<{
+    name: string;
+    ports: number[];
+  } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   const getStatusVariant = (status: string) => {
@@ -203,7 +204,7 @@ export function PodsList() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setSelectedPodForPortForward(pod.name)}
+                      onClick={() => setSelectedPodForPortForward({ name: pod.name, ports: pod.ports })}
                       title={`Port Forward (${pod.ports.join(', ')})`}
                     >
                       <ArrowRightLeft className="w-4 h-4" />
@@ -262,8 +263,9 @@ export function PodsList() {
       {selectedPodForPortForward && (
         <PortForwardModal
           resourceType="pod"
-          resourceName={selectedPodForPortForward}
+          resourceName={selectedPodForPortForward.name}
           namespace={currentNamespace}
+          availablePorts={selectedPodForPortForward.ports}
           onClose={() => setSelectedPodForPortForward(null)}
         />
       )}
