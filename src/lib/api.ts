@@ -17,6 +17,11 @@ import type {
   EventInfo,
   PersistentVolumeInfo,
   PersistentVolumeClaimInfo,
+  RoleInfo,
+  RoleBindingInfo,
+  ClusterRoleInfo,
+  ClusterRoleBindingInfo,
+  ServiceAccountInfo,
 } from "../types";
 
 export const api = {
@@ -160,5 +165,26 @@ export const api = {
     namespace: string
   ): Promise<PersistentVolumeClaimInfo[]> {
     return await invoke("get_persistent_volume_claims", { namespace });
+  },
+
+  // RBAC operations
+  async getRoles(namespace: string): Promise<RoleInfo[]> {
+    return await invoke("get_roles", { namespace });
+  },
+
+  async getRoleBindings(namespace: string): Promise<RoleBindingInfo[]> {
+    return await invoke("get_role_bindings", { namespace });
+  },
+
+  async getClusterRoles(): Promise<ClusterRoleInfo[]> {
+    return await invoke("get_cluster_roles");
+  },
+
+  async getClusterRoleBindings(): Promise<ClusterRoleBindingInfo[]> {
+    return await invoke("get_cluster_role_bindings");
+  },
+
+  async getServiceAccounts(namespace: string): Promise<ServiceAccountInfo[]> {
+    return await invoke("get_service_accounts", { namespace });
   },
 };

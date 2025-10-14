@@ -14,6 +14,7 @@ import {
   Activity,
   Cpu,
   LayoutDashboard,
+  Shield,
 } from "lucide-react";
 import { ResourceType } from "../types";
 import { Logo } from "./Logo";
@@ -54,6 +55,10 @@ const navSections: {
   {
     title: "Storage",
     items: [{ icon: HardDrive, label: "Storage", view: "storage" }],
+  },
+  {
+    title: "Security",
+    items: [{ icon: Shield, label: "RBAC", view: "rbac" }],
   },
   {
     title: "Cluster",

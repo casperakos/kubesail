@@ -14,6 +14,7 @@ import { ConfigMapsList } from "./features/configmaps/ConfigMapsList";
 import { SecretsList } from "./features/secrets/SecretsList";
 import { WorkloadsList } from "./features/workloads/WorkloadsList";
 import { StorageList } from "./features/storage/StorageList";
+import { RBACList } from "./features/rbac/RBACList";
 import { NodesList } from "./features/nodes/NodesList";
 import { EventsList } from "./features/events/EventsList";
 import { useAppStore } from "./lib/store";
@@ -86,6 +87,7 @@ function MainContent() {
         {currentView === "jobs" && <WorkloadsList />}
         {currentView === "cronjobs" && <WorkloadsList />}
         {currentView === "storage" && <StorageList />}
+        {currentView === "rbac" && <RBACList />}
         {currentView === "nodes" && <NodesList />}
         {currentView === "events" && <EventsList />}
         {currentView === "namespaces" && (

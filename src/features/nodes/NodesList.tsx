@@ -146,9 +146,9 @@ export function NodesList() {
               </div>
             </div>
           </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

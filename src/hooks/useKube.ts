@@ -219,3 +219,47 @@ export function usePersistentVolumeClaims(namespace: string) {
     refetchInterval: 10000,
   });
 }
+
+// RBAC Hooks
+export function useRoles(namespace: string) {
+  return useQuery({
+    queryKey: ["roles", namespace],
+    queryFn: () => api.getRoles(namespace),
+    enabled: !!namespace,
+    refetchInterval: 10000,
+  });
+}
+
+export function useRoleBindings(namespace: string) {
+  return useQuery({
+    queryKey: ["role-bindings", namespace],
+    queryFn: () => api.getRoleBindings(namespace),
+    enabled: !!namespace,
+    refetchInterval: 10000,
+  });
+}
+
+export function useClusterRoles() {
+  return useQuery({
+    queryKey: ["cluster-roles"],
+    queryFn: () => api.getClusterRoles(),
+    refetchInterval: 10000,
+  });
+}
+
+export function useClusterRoleBindings() {
+  return useQuery({
+    queryKey: ["cluster-role-bindings"],
+    queryFn: () => api.getClusterRoleBindings(),
+    refetchInterval: 10000,
+  });
+}
+
+export function useServiceAccounts(namespace: string) {
+  return useQuery({
+    queryKey: ["service-accounts", namespace],
+    queryFn: () => api.getServiceAccounts(namespace),
+    enabled: !!namespace,
+    refetchInterval: 10000,
+  });
+}
