@@ -10,12 +10,14 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Shield, Globe } from "lucide-react";
+import { RefreshCw, Shield, Globe, Search, X } from "lucide-react";
 import { IngressInfo } from "../../types";
+import { useState, useMemo } from "react";
 
 export function IngressesList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const { data: ingresses, isLoading, error, refetch } = useIngresses(currentNamespace);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const getIngressClassVariant = (className?: string) => {
     if (!className) return "secondary";
@@ -25,48 +27,119 @@ export function IngressesList() {
     return "secondary";
   };
 
+  // Filter ingresses based on search query
+  const filteredIngresses = useMemo(() => {
+    if (!ingresses) return [];
+    if (!searchQuery) return ingresses;
+
+    const query = searchQuery.toLowerCase();
+    return ingresses.filter(ingress =>
+      ingress.name.toLowerCase().includes(query) ||
+      ingress.class?.toLowerCase().includes(query) ||
+      ingress.hosts.some(host => host.toLowerCase().includes(query)) ||
+      ingress.addresses.some(addr => addr.toLowerCase().includes(query))
+    );
+  }, [ingresses, searchQuery]);
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
+      <div className="flex items-center justify-center h-64 animate-fade-in">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
+            <div className="absolute inset-0 w-12 h-12 rounded-full border-4 border-transparent border-t-purple-500 animate-spin" style={{animationDirection: 'reverse', animationDuration: '1.5s'}}></div>
+          </div>
+          <p className="text-sm text-muted-foreground font-medium">Loading ingresses...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-4 text-destructive">
-        Error loading ingresses: {error.message}
+      <div className="p-8 rounded-xl border border-destructive/50 bg-gradient-to-br from-destructive/10 to-destructive/5 backdrop-blur-sm animate-fade-in">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="w-12 h-12 rounded-full bg-destructive/20 flex items-center justify-center">
+            <RefreshCw className="w-6 h-6 text-destructive" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-destructive mb-1">Error loading ingresses</h3>
+            <p className="text-sm text-muted-foreground">{error.message}</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!ingresses || ingresses.length === 0) {
     return (
-      <div className="p-8 text-center text-muted-foreground">
-        No ingresses found in namespace "{currentNamespace}"
+      <div className="p-12 text-center rounded-xl border border-border/50 bg-gradient-to-br from-muted/30 to-muted/10 backdrop-blur-sm animate-fade-in">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
+            <Globe className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-foreground mb-1">No ingresses found</h3>
+            <p className="text-sm text-muted-foreground">
+              No ingresses found in namespace "{currentNamespace}"
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">Ingress Resources</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Nginx, Istio, Traefik, and other ingress controllers
-          </p>
+    <div className="space-y-6 animate-fade-in">
+      {/* Header with glassmorphism */}
+      <div className="p-6 rounded-xl border border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl shadow-lg space-y-4">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-12 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+                  Ingress Resources
+                </h2>
+                <Badge variant="secondary">
+                  {filteredIngresses?.length || 0} {searchQuery && `of ${ingresses?.length || 0}`}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Nginx, Istio, Traefik, and other ingress controllers
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isLoading}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by name, class, host, or address..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2.5 text-sm bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all placeholder:text-muted-foreground"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <Table>
@@ -81,7 +154,14 @@ export function IngressesList() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {ingresses.map((ingress: IngressInfo) => (
+          {filteredIngresses.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                {searchQuery ? `No ingresses found matching "${searchQuery}"` : "No ingresses found"}
+              </TableCell>
+            </TableRow>
+          ) : (
+            filteredIngresses.map((ingress: IngressInfo) => (
             <TableRow key={ingress.name}>
               <TableCell className="font-medium">{ingress.name}</TableCell>
               <TableCell>
@@ -132,7 +212,8 @@ export function IngressesList() {
               </TableCell>
               <TableCell>{ingress.age}</TableCell>
             </TableRow>
-          ))}
+            ))
+          )}
         </TableBody>
       </Table>
     </div>

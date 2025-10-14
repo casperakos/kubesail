@@ -11,15 +11,15 @@ const Badge = forwardRef<HTMLDivElement, BadgeProps>(
       <div
         ref={ref}
         className={cn(
-          "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+          "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 shadow-sm hover:shadow-md",
           {
-            "border-transparent bg-primary text-primary-foreground":
+            "border border-primary/20 bg-gradient-to-r from-primary/90 to-primary/80 text-primary-foreground":
               variant === "default",
-            "border-transparent bg-green-500 text-white": variant === "success",
-            "border-transparent bg-yellow-500 text-white": variant === "warning",
-            "border-transparent bg-destructive text-destructive-foreground":
+            "border border-green-500/20 bg-gradient-to-r from-green-500/90 to-green-600/90 text-white": variant === "success",
+            "border border-yellow-500/20 bg-gradient-to-r from-yellow-500/90 to-yellow-600/90 text-white": variant === "warning",
+            "border border-destructive/20 bg-gradient-to-r from-destructive/90 to-destructive/80 text-destructive-foreground":
               variant === "destructive",
-            "border-transparent bg-secondary text-secondary-foreground":
+            "border border-secondary/20 bg-gradient-to-r from-secondary/90 to-secondary/80 text-secondary-foreground":
               variant === "secondary",
           },
           className

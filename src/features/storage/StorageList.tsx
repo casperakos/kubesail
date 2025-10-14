@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   usePersistentVolumes,
   usePersistentVolumeClaims,
@@ -14,22 +14,49 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Search, X } from "lucide-react";
 
 type StorageType = "pv" | "pvc";
 
 export function StorageList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const [activeTab, setActiveTab] = useState<StorageType>("pvc");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: pvs, isLoading: pvLoading, error: pvError, refetch: pvRefetch } =
     usePersistentVolumes();
   const { data: pvcs, isLoading: pvcLoading, error: pvcError, refetch: pvcRefetch } =
     usePersistentVolumeClaims(currentNamespace);
 
-  const tabs: { value: StorageType; label: string; count: number }[] = [
-    { value: "pvc", label: "PersistentVolumeClaims", count: pvcs?.length || 0 },
-    { value: "pv", label: "PersistentVolumes", count: pvs?.length || 0 },
+  // Filter PVs based on search query
+  const filteredPvs = useMemo(() => {
+    if (!pvs) return [];
+    if (!searchQuery) return pvs;
+    const query = searchQuery.toLowerCase();
+    return pvs.filter(pv =>
+      pv.name.toLowerCase().includes(query) ||
+      pv.status.toLowerCase().includes(query) ||
+      pv.claim?.toLowerCase().includes(query) ||
+      pv.storage_class?.toLowerCase().includes(query)
+    );
+  }, [pvs, searchQuery]);
+
+  // Filter PVCs based on search query
+  const filteredPvcs = useMemo(() => {
+    if (!pvcs) return [];
+    if (!searchQuery) return pvcs;
+    const query = searchQuery.toLowerCase();
+    return pvcs.filter(pvc =>
+      pvc.name.toLowerCase().includes(query) ||
+      pvc.status.toLowerCase().includes(query) ||
+      pvc.volume?.toLowerCase().includes(query) ||
+      pvc.storage_class?.toLowerCase().includes(query)
+    );
+  }, [pvcs, searchQuery]);
+
+  const tabs: { value: StorageType; label: string; count: number; filteredCount: number }[] = [
+    { value: "pvc", label: "PersistentVolumeClaims", count: pvcs?.length || 0, filteredCount: filteredPvcs?.length || 0 },
+    { value: "pv", label: "PersistentVolumes", count: pvs?.length || 0, filteredCount: filteredPvs?.length || 0 },
   ];
 
   const handleRefresh = () => {
@@ -43,54 +70,81 @@ export function StorageList() {
   const isLoading = pvLoading || pvcLoading;
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Storage</h2>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={isLoading}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
-      </div>
-
-      <div className="flex space-x-1 border-b border-border">
-        {tabs.map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => setActiveTab(tab.value)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              activeTab === tab.value
-                ? "border-b-2 border-primary text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+    <div className="space-y-6 animate-fade-in">
+      <div className="p-6 rounded-xl border border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl shadow-lg space-y-4">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+              Storage
+            </h2>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isLoading}
           >
-            {tab.label}
-            <Badge variant="secondary" className="ml-2">
-              {tab.count}
-            </Badge>
-          </button>
-        ))}
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
+
+        <div className="flex space-x-1 border-b border-border">
+          {tabs.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setActiveTab(tab.value)}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === tab.value
+                  ? "border-b-2 border-primary text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+              <Badge variant="secondary" className="ml-2">
+                {searchQuery ? `${tab.filteredCount} of ${tab.count}` : tab.count}
+              </Badge>
+            </button>
+          ))}
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by name, status, or storage class..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2.5 text-sm bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all placeholder:text-muted-foreground"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {activeTab === "pv" && (
-        <PersistentVolumesTable data={pvs} isLoading={pvLoading} error={pvError} />
+        <PersistentVolumesTable data={filteredPvs} isLoading={pvLoading} error={pvError} searchQuery={searchQuery} />
       )}
       {activeTab === "pvc" && (
         <PersistentVolumeClaimsTable
-          data={pvcs}
+          data={filteredPvcs}
           isLoading={pvcLoading}
           error={pvcError}
+          searchQuery={searchQuery}
         />
       )}
     </div>
   );
 }
 
-function PersistentVolumesTable({ data, isLoading, error }: any) {
+function PersistentVolumesTable({ data, isLoading, error, searchQuery }: any) {
   const getStatusVariant = (status: string) => {
     switch (status.toLowerCase()) {
       case "bound":
@@ -122,14 +176,6 @@ function PersistentVolumesTable({ data, isLoading, error }: any) {
     );
   }
 
-  if (!data || data.length === 0) {
-    return (
-      <div className="p-8 text-center text-muted-foreground">
-        No persistent volumes found
-      </div>
-    );
-  }
-
   return (
     <Table>
       <TableHeader>
@@ -145,7 +191,14 @@ function PersistentVolumesTable({ data, isLoading, error }: any) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data.map((pv: any) => (
+        {!data || data.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+              {searchQuery ? `No persistent volumes found matching "${searchQuery}"` : "No persistent volumes found"}
+            </TableCell>
+          </TableRow>
+        ) : (
+          data.map((pv: any) => (
           <TableRow key={pv.name}>
             <TableCell className="font-medium">{pv.name}</TableCell>
             <TableCell>{pv.capacity}</TableCell>
@@ -172,13 +225,14 @@ function PersistentVolumesTable({ data, isLoading, error }: any) {
             </TableCell>
             <TableCell>{pv.age}</TableCell>
           </TableRow>
-        ))}
+          ))
+        )}
       </TableBody>
     </Table>
   );
 }
 
-function PersistentVolumeClaimsTable({ data, isLoading, error }: any) {
+function PersistentVolumeClaimsTable({ data, isLoading, error, searchQuery }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
 
   const getStatusVariant = (status: string) => {
@@ -210,14 +264,6 @@ function PersistentVolumeClaimsTable({ data, isLoading, error }: any) {
     );
   }
 
-  if (!data || data.length === 0) {
-    return (
-      <div className="p-8 text-center text-muted-foreground">
-        No persistent volume claims found in namespace "{currentNamespace}"
-      </div>
-    );
-  }
-
   return (
     <Table>
       <TableHeader>
@@ -232,7 +278,16 @@ function PersistentVolumeClaimsTable({ data, isLoading, error }: any) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data.map((pvc: any) => (
+        {!data || data.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+              {searchQuery
+                ? `No persistent volume claims found matching "${searchQuery}"`
+                : `No persistent volume claims found in namespace "${currentNamespace}"`}
+            </TableCell>
+          </TableRow>
+        ) : (
+          data.map((pvc: any) => (
           <TableRow key={pvc.name}>
             <TableCell className="font-medium">{pvc.name}</TableCell>
             <TableCell>
@@ -256,7 +311,8 @@ function PersistentVolumeClaimsTable({ data, isLoading, error }: any) {
             </TableCell>
             <TableCell>{pvc.age}</TableCell>
           </TableRow>
-        ))}
+          ))
+        )}
       </TableBody>
     </Table>
   );

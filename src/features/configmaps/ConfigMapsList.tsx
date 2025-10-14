@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useConfigMaps } from "../../hooks/useKube";
 import { useAppStore } from "../../lib/store";
 import {
@@ -11,13 +11,26 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Eye } from "lucide-react";
+import { RefreshCw, Eye, Search, X } from "lucide-react";
 import { ConfigMapInfo } from "../../types";
 
 export function ConfigMapsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const { data: configmaps, isLoading, error, refetch } = useConfigMaps(currentNamespace);
   const [selectedConfigMap, setSelectedConfigMap] = useState<ConfigMapInfo | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filter configmaps based on search query
+  const filteredConfigMaps = useMemo(() => {
+    if (!configmaps) return [];
+    if (!searchQuery) return configmaps;
+
+    const query = searchQuery.toLowerCase();
+    return configmaps.filter(cm =>
+      cm.name.toLowerCase().includes(query) ||
+      Object.keys(cm.data).some(key => key.toLowerCase().includes(query))
+    );
+  }, [configmaps, searchQuery]);
 
   if (isLoading) {
     return (
@@ -44,18 +57,47 @@ export function ConfigMapsList() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">ConfigMaps</h2>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isLoading}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+    <div className="space-y-6 animate-fade-in">
+      <div className="p-6 rounded-xl border border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl shadow-lg space-y-4">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+              ConfigMaps
+            </h2>
+            <Badge variant="secondary" className="ml-2">
+              {filteredConfigMaps?.length || 0} {searchQuery && `of ${configmaps?.length || 0}`}
+            </Badge>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by name or key..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2.5 text-sm bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all placeholder:text-muted-foreground"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <Table>
@@ -68,7 +110,14 @@ export function ConfigMapsList() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {configmaps.map((cm) => (
+          {filteredConfigMaps.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                {searchQuery ? `No configmaps found matching "${searchQuery}"` : "No configmaps found"}
+              </TableCell>
+            </TableRow>
+          ) : (
+            filteredConfigMaps.map((cm) => (
             <TableRow key={cm.name}>
               <TableCell className="font-medium">{cm.name}</TableCell>
               <TableCell>
@@ -86,7 +135,8 @@ export function ConfigMapsList() {
                 </Button>
               </TableCell>
             </TableRow>
-          ))}
+            ))
+          )}
         </TableBody>
       </Table>
 

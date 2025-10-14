@@ -187,6 +187,7 @@ export interface PersistentVolumeClaimInfo {
 }
 
 export type ResourceType =
+  | "dashboard"
   | "pods"
   | "deployments"
   | "services"
@@ -202,6 +203,18 @@ export type ResourceType =
   | "nodes"
   | "events"
   | "storage";
+
+export interface ClusterMetrics {
+  total_nodes: number;
+  ready_nodes: number;
+  total_pods: number;
+  running_pods: number;
+  total_namespaces: number;
+  total_deployments: number;
+  total_services: number;
+  cpu_usage_percent?: number;
+  memory_usage_percent?: number;
+}
 
 export interface AppState {
   currentContext?: string;

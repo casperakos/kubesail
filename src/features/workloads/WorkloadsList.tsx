@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   useStatefulSets,
   useDaemonSets,
@@ -16,13 +16,14 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Search, X } from "lucide-react";
 
 type WorkloadType = "statefulsets" | "daemonsets" | "jobs" | "cronjobs";
 
 export function WorkloadsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const [activeTab, setActiveTab] = useState<WorkloadType>("statefulsets");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: statefulsets, isLoading: stsLoading, error: stsError, refetch: stsRefetch } =
     useStatefulSets(currentNamespace);
@@ -33,11 +34,46 @@ export function WorkloadsList() {
   const { data: cronjobs, isLoading: cjLoading, error: cjError, refetch: cjRefetch } =
     useCronJobs(currentNamespace);
 
-  const tabs: { value: WorkloadType; label: string; count: number }[] = [
-    { value: "statefulsets", label: "StatefulSets", count: statefulsets?.length || 0 },
-    { value: "daemonsets", label: "DaemonSets", count: daemonsets?.length || 0 },
-    { value: "jobs", label: "Jobs", count: jobs?.length || 0 },
-    { value: "cronjobs", label: "CronJobs", count: cronjobs?.length || 0 },
+  // Filter StatefulSets based on search query
+  const filteredStatefulSets = useMemo(() => {
+    if (!statefulsets) return [];
+    if (!searchQuery) return statefulsets;
+    const query = searchQuery.toLowerCase();
+    return statefulsets.filter(sts => sts.name.toLowerCase().includes(query));
+  }, [statefulsets, searchQuery]);
+
+  // Filter DaemonSets based on search query
+  const filteredDaemonSets = useMemo(() => {
+    if (!daemonsets) return [];
+    if (!searchQuery) return daemonsets;
+    const query = searchQuery.toLowerCase();
+    return daemonsets.filter(ds => ds.name.toLowerCase().includes(query));
+  }, [daemonsets, searchQuery]);
+
+  // Filter Jobs based on search query
+  const filteredJobs = useMemo(() => {
+    if (!jobs) return [];
+    if (!searchQuery) return jobs;
+    const query = searchQuery.toLowerCase();
+    return jobs.filter(job => job.name.toLowerCase().includes(query));
+  }, [jobs, searchQuery]);
+
+  // Filter CronJobs based on search query
+  const filteredCronJobs = useMemo(() => {
+    if (!cronjobs) return [];
+    if (!searchQuery) return cronjobs;
+    const query = searchQuery.toLowerCase();
+    return cronjobs.filter(cj =>
+      cj.name.toLowerCase().includes(query) ||
+      cj.schedule?.toLowerCase().includes(query)
+    );
+  }, [cronjobs, searchQuery]);
+
+  const tabs: { value: WorkloadType; label: string; count: number; filteredCount: number }[] = [
+    { value: "statefulsets", label: "StatefulSets", count: statefulsets?.length || 0, filteredCount: filteredStatefulSets?.length || 0 },
+    { value: "daemonsets", label: "DaemonSets", count: daemonsets?.length || 0, filteredCount: filteredDaemonSets?.length || 0 },
+    { value: "jobs", label: "Jobs", count: jobs?.length || 0, filteredCount: filteredJobs?.length || 0 },
+    { value: "cronjobs", label: "CronJobs", count: cronjobs?.length || 0, filteredCount: filteredCronJobs?.length || 0 },
   ];
 
   const handleRefresh = () => {
@@ -60,64 +96,102 @@ export function WorkloadsList() {
   const isLoading = stsLoading || dsLoading || jobsLoading || cjLoading;
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Workloads</h2>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={isLoading}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
-      </div>
-
-      <div className="flex space-x-1 border-b border-border">
-        {tabs.map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => setActiveTab(tab.value)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              activeTab === tab.value
-                ? "border-b-2 border-primary text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
+    <div className="space-y-6 animate-fade-in">
+      <div className="p-6 rounded-xl border border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl shadow-lg space-y-4">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+              Workloads
+            </h2>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isLoading}
           >
-            {tab.label}
-            <Badge variant="secondary" className="ml-2">
-              {tab.count}
-            </Badge>
-          </button>
-        ))}
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
+
+        <div className="flex space-x-1 border-b border-border">
+          {tabs.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setActiveTab(tab.value)}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === tab.value
+                  ? "border-b-2 border-primary text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+              <Badge variant="secondary" className="ml-2">
+                {searchQuery ? `${tab.filteredCount} of ${tab.count}` : tab.count}
+              </Badge>
+            </button>
+          ))}
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by name or schedule..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2.5 text-sm bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all placeholder:text-muted-foreground"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {activeTab === "statefulsets" && (
         <StatefulSetsTable
-          data={statefulsets}
+          data={filteredStatefulSets}
           isLoading={stsLoading}
           error={stsError}
+          searchQuery={searchQuery}
         />
       )}
       {activeTab === "daemonsets" && (
         <DaemonSetsTable
-          data={daemonsets}
+          data={filteredDaemonSets}
           isLoading={dsLoading}
           error={dsError}
+          searchQuery={searchQuery}
         />
       )}
       {activeTab === "jobs" && (
-        <JobsTable data={jobs} isLoading={jobsLoading} error={jobsError} />
+        <JobsTable
+          data={filteredJobs}
+          isLoading={jobsLoading}
+          error={jobsError}
+          searchQuery={searchQuery}
+        />
       )}
       {activeTab === "cronjobs" && (
-        <CronJobsTable data={cronjobs} isLoading={cjLoading} error={cjError} />
+        <CronJobsTable
+          data={filteredCronJobs}
+          isLoading={cjLoading}
+          error={cjError}
+          searchQuery={searchQuery}
+        />
       )}
     </div>
   );
 }
 
-function StatefulSetsTable({ data, isLoading, error }: any) {
+function StatefulSetsTable({ data, isLoading, error, searchQuery }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
 
   if (isLoading) {
@@ -136,14 +210,6 @@ function StatefulSetsTable({ data, isLoading, error }: any) {
     );
   }
 
-  if (!data || data.length === 0) {
-    return (
-      <div className="p-8 text-center text-muted-foreground">
-        No statefulsets found in namespace "{currentNamespace}"
-      </div>
-    );
-  }
-
   return (
     <Table>
       <TableHeader>
@@ -155,7 +221,16 @@ function StatefulSetsTable({ data, isLoading, error }: any) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data.map((sts: any) => (
+        {!data || data.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+              {searchQuery
+                ? `No statefulsets found matching "${searchQuery}"`
+                : `No statefulsets found in namespace "${currentNamespace}"`}
+            </TableCell>
+          </TableRow>
+        ) : (
+          data.map((sts: any) => (
           <TableRow key={sts.name}>
             <TableCell className="font-medium">{sts.name}</TableCell>
             <TableCell>
@@ -172,13 +247,14 @@ function StatefulSetsTable({ data, isLoading, error }: any) {
             <TableCell>{sts.replicas}</TableCell>
             <TableCell>{sts.age}</TableCell>
           </TableRow>
-        ))}
+          ))
+        )}
       </TableBody>
     </Table>
   );
 }
 
-function DaemonSetsTable({ data, isLoading, error }: any) {
+function DaemonSetsTable({ data, isLoading, error, searchQuery }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
 
   if (isLoading) {
@@ -197,14 +273,6 @@ function DaemonSetsTable({ data, isLoading, error }: any) {
     );
   }
 
-  if (!data || data.length === 0) {
-    return (
-      <div className="p-8 text-center text-muted-foreground">
-        No daemonsets found in namespace "{currentNamespace}"
-      </div>
-    );
-  }
-
   return (
     <Table>
       <TableHeader>
@@ -219,7 +287,16 @@ function DaemonSetsTable({ data, isLoading, error }: any) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data.map((ds: any) => (
+        {!data || data.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+              {searchQuery
+                ? `No daemonsets found matching "${searchQuery}"`
+                : `No daemonsets found in namespace "${currentNamespace}"`}
+            </TableCell>
+          </TableRow>
+        ) : (
+          data.map((ds: any) => (
           <TableRow key={ds.name}>
             <TableCell className="font-medium">{ds.name}</TableCell>
             <TableCell>{ds.desired}</TableCell>
@@ -233,13 +310,14 @@ function DaemonSetsTable({ data, isLoading, error }: any) {
             <TableCell>{ds.available}</TableCell>
             <TableCell>{ds.age}</TableCell>
           </TableRow>
-        ))}
+          ))
+        )}
       </TableBody>
     </Table>
   );
 }
 
-function JobsTable({ data, isLoading, error }: any) {
+function JobsTable({ data, isLoading, error, searchQuery }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
 
   if (isLoading) {
@@ -253,14 +331,6 @@ function JobsTable({ data, isLoading, error }: any) {
   if (error) {
     return (
       <div className="p-4 text-destructive">Error loading jobs: {error.message}</div>
-    );
-  }
-
-  if (!data || data.length === 0) {
-    return (
-      <div className="p-8 text-center text-muted-foreground">
-        No jobs found in namespace "{currentNamespace}"
-      </div>
     );
   }
 
@@ -278,7 +348,16 @@ function JobsTable({ data, isLoading, error }: any) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data.map((job: any) => (
+        {!data || data.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+              {searchQuery
+                ? `No jobs found matching "${searchQuery}"`
+                : `No jobs found in namespace "${currentNamespace}"`}
+            </TableCell>
+          </TableRow>
+        ) : (
+          data.map((job: any) => (
           <TableRow key={job.name}>
             <TableCell className="font-medium">{job.name}</TableCell>
             <TableCell>{job.completions}</TableCell>
@@ -300,13 +379,14 @@ function JobsTable({ data, isLoading, error }: any) {
             <TableCell>{job.duration}</TableCell>
             <TableCell>{job.age}</TableCell>
           </TableRow>
-        ))}
+          ))
+        )}
       </TableBody>
     </Table>
   );
 }
 
-function CronJobsTable({ data, isLoading, error }: any) {
+function CronJobsTable({ data, isLoading, error, searchQuery }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
 
   if (isLoading) {
@@ -325,14 +405,6 @@ function CronJobsTable({ data, isLoading, error }: any) {
     );
   }
 
-  if (!data || data.length === 0) {
-    return (
-      <div className="p-8 text-center text-muted-foreground">
-        No cronjobs found in namespace "{currentNamespace}"
-      </div>
-    );
-  }
-
   return (
     <Table>
       <TableHeader>
@@ -346,7 +418,16 @@ function CronJobsTable({ data, isLoading, error }: any) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data.map((cj: any) => (
+        {!data || data.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+              {searchQuery
+                ? `No cronjobs found matching "${searchQuery}"`
+                : `No cronjobs found in namespace "${currentNamespace}"`}
+            </TableCell>
+          </TableRow>
+        ) : (
+          data.map((cj: any) => (
           <TableRow key={cj.name}>
             <TableCell className="font-medium">{cj.name}</TableCell>
             <TableCell>
@@ -365,7 +446,8 @@ function CronJobsTable({ data, isLoading, error }: any) {
             </TableCell>
             <TableCell>{cj.age}</TableCell>
           </TableRow>
-        ))}
+          ))
+        )}
       </TableBody>
     </Table>
   );

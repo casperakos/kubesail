@@ -7,7 +7,7 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       currentContext: undefined,
       currentNamespace: "default",
-      currentView: "pods",
+      currentView: "dashboard",
       theme: "dark",
       setCurrentContext: (context) => set({ currentContext: context }),
       setCurrentNamespace: (namespace) => set({ currentNamespace: namespace }),

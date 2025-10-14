@@ -3,7 +3,7 @@ import { cn } from "../../lib/utils";
 
 const Table = forwardRef<HTMLTableElement, HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="w-full overflow-auto">
+    <div className="w-full overflow-auto custom-scrollbar rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
       <table
         ref={ref}
         className={cn("w-full caption-bottom text-sm", className)}
@@ -18,7 +18,7 @@ const TableHeader = forwardRef<
   HTMLTableSectionElement,
   HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />
+  <thead ref={ref} className={cn("[&_tr]:border-b bg-gradient-to-r from-muted/50 to-muted/30 backdrop-blur-sm", className)} {...props} />
 ));
 TableHeader.displayName = "TableHeader";
 
@@ -41,7 +41,7 @@ const TableRow = forwardRef<
   <tr
     ref={ref}
     className={cn(
-      "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+      "border-b border-border/30 transition-all duration-200 hover:bg-gradient-to-r hover:from-primary/5 hover:to-primary/10 data-[state=selected]:bg-muted animate-fade-in",
       className
     )}
     {...props}
@@ -56,7 +56,7 @@ const TableHead = forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
+      "h-12 px-4 text-left align-middle font-semibold text-xs uppercase tracking-wider text-muted-foreground/80 [&:has([role=checkbox])]:pr-0",
       className
     )}
     {...props}

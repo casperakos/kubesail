@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useSecrets } from "../../hooks/useKube";
 import { useAppStore } from "../../lib/store";
 import {
@@ -11,19 +11,33 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Eye, EyeOff } from "lucide-react";
+import { RefreshCw, Eye, EyeOff, Search, X } from "lucide-react";
 import { SecretInfo } from "../../types";
 
 export function SecretsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const { data: secrets, isLoading, error, refetch } = useSecrets(currentNamespace);
   const [selectedSecret, setSelectedSecret] = useState<SecretInfo | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const getTypeVariant = (type: string) => {
     if (type.includes("tls")) return "success";
     if (type.includes("token")) return "warning";
     return "secondary";
   };
+
+  // Filter secrets based on search query
+  const filteredSecrets = useMemo(() => {
+    if (!secrets) return [];
+    if (!searchQuery) return secrets;
+
+    const query = searchQuery.toLowerCase();
+    return secrets.filter(secret =>
+      secret.name.toLowerCase().includes(query) ||
+      secret.secret_type.toLowerCase().includes(query) ||
+      Object.keys(secret.data).some(key => key.toLowerCase().includes(query))
+    );
+  }, [secrets, searchQuery]);
 
   if (isLoading) {
     return (
@@ -50,18 +64,47 @@ export function SecretsList() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Secrets</h2>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isLoading}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+    <div className="space-y-6 animate-fade-in">
+      <div className="p-6 rounded-xl border border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl shadow-lg space-y-4">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+              Secrets
+            </h2>
+            <Badge variant="secondary" className="ml-2">
+              {filteredSecrets?.length || 0} {searchQuery && `of ${secrets?.length || 0}`}
+            </Badge>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by name, type, or key..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2.5 text-sm bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all placeholder:text-muted-foreground"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <Table>
@@ -75,7 +118,14 @@ export function SecretsList() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {secrets.map((secret) => (
+          {filteredSecrets.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                {searchQuery ? `No secrets found matching "${searchQuery}"` : "No secrets found"}
+              </TableCell>
+            </TableRow>
+          ) : (
+            filteredSecrets.map((secret) => (
             <TableRow key={secret.name}>
               <TableCell className="font-medium">{secret.name}</TableCell>
               <TableCell>
@@ -98,7 +148,8 @@ export function SecretsList() {
                 </Button>
               </TableCell>
             </TableRow>
-          ))}
+            ))
+          )}
         </TableBody>
       </Table>
 

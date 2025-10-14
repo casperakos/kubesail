@@ -4,6 +4,7 @@ import { Sidebar } from "./components/Sidebar";
 import { NamespaceSelector } from "./components/NamespaceSelector";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { CommandPalette } from "./components/CommandPalette";
+import { Dashboard } from "./features/dashboard/Dashboard";
 import { PodsList } from "./features/pods/PodsList";
 import { DeploymentsList } from "./features/deployments/DeploymentsList";
 import { ServicesList } from "./features/services/ServicesList";
@@ -49,18 +50,21 @@ function MainContent() {
         onClose={() => setCommandPaletteOpen(false)}
       />
 
-      <header className="border-b bg-card px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between shadow-sm sticky top-0 z-40">
         <div className="flex items-center gap-4">
-          <h2 className="text-lg font-semibold">Namespace:</h2>
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+            <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wide">Namespace</h2>
+          </div>
           <NamespaceSelector />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => setCommandPaletteOpen(true)}
-            className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground border rounded-md flex items-center gap-2"
+            className="group px-4 py-2 text-sm text-muted-foreground hover:text-foreground border border-border/50 rounded-xl flex items-center gap-2 hover:shadow-md hover:border-primary/30 transition-all duration-200 bg-background/50 backdrop-blur-sm"
           >
-            <span>Search</span>
-            <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">
+            <span className="font-medium">Search</span>
+            <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded-lg border border-border/50 bg-muted/50 px-2 font-mono text-[10px] font-medium shadow-sm group-hover:border-primary/30 transition-colors">
               <span className="text-xs">⌘</span>K
             </kbd>
           </button>
@@ -69,6 +73,7 @@ function MainContent() {
       </header>
 
       <main className="flex-1 overflow-auto p-6">
+        {currentView === "dashboard" && <Dashboard />}
         {currentView === "pods" && <PodsList />}
         {currentView === "deployments" && <DeploymentsList />}
         {currentView === "services" && <ServicesList />}

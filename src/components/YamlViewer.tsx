@@ -74,10 +74,10 @@ export function YamlViewer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-card border rounded-lg shadow-2xl w-full max-w-6xl h-[80vh] flex flex-col">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-gradient-to-br from-card/95 to-card/90 border border-border/50 rounded-xl shadow-2xl w-full max-w-6xl h-[80vh] flex flex-col backdrop-blur-xl animate-slide-in">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center justify-between p-4 border-b border-border/50 bg-gradient-to-r from-background/50 to-background/30">
           <div>
             <h2 className="text-lg font-semibold">Resource YAML</h2>
             <div className="flex items-center gap-2 mt-1">
@@ -118,7 +118,7 @@ export function YamlViewer({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-4 bg-muted/30">
+        <div className="flex-1 overflow-auto p-4 bg-gradient-to-br from-muted/30 to-muted/20 custom-scrollbar">
           {loading && (
             <div className="flex items-center justify-center h-full">
               <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -142,7 +142,7 @@ export function YamlViewer({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t text-sm text-muted-foreground">
+        <div className="flex items-center justify-between p-4 border-t border-border/50 bg-gradient-to-r from-background/50 to-background/30 text-sm text-muted-foreground">
           <div>{yaml.split("\n").length} lines</div>
           <div>Press Esc to close</div>
         </div>

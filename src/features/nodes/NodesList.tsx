@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { useNodes } from "../../hooks/useKube";
 import {
   Table,
@@ -9,16 +10,32 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Search, X } from "lucide-react";
 
 export function NodesList() {
   const { data: nodes, isLoading, error, refetch } = useNodes();
+  const [searchQuery, setSearchQuery] = useState("");
 
   const getStatusVariant = (status: string) => {
     if (status === "Ready") return "success";
     if (status === "NotReady") return "destructive";
     return "secondary";
   };
+
+  // Filter nodes based on search query
+  const filteredNodes = useMemo(() => {
+    if (!nodes) return [];
+    if (!searchQuery) return nodes;
+
+    const query = searchQuery.toLowerCase();
+    return nodes.filter(node =>
+      node.name.toLowerCase().includes(query) ||
+      node.status.toLowerCase().includes(query) ||
+      node.version.toLowerCase().includes(query) ||
+      node.internal_ip.toLowerCase().includes(query) ||
+      node.roles.some(role => role.toLowerCase().includes(query))
+    );
+  }, [nodes, searchQuery]);
 
   if (isLoading) {
     return (
@@ -36,31 +53,59 @@ export function NodesList() {
     );
   }
 
-  if (!nodes || nodes.length === 0) {
-    return (
-      <div className="p-8 text-center text-muted-foreground">
-        No nodes found in cluster
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Nodes</h2>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isLoading}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+    <div className="space-y-6 animate-fade-in">
+      <div className="p-6 rounded-xl border border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl shadow-lg space-y-4">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+              Nodes
+            </h2>
+            <Badge variant="secondary" className="ml-2">
+              {filteredNodes?.length || 0} {searchQuery && `of ${nodes?.length || 0}`}
+            </Badge>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Search by name, status, role, version, or IP..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-2.5 text-sm bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all placeholder:text-muted-foreground"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="grid gap-4">
-        {nodes.map((node) => (
+      {!filteredNodes || filteredNodes.length === 0 ? (
+        <div className="p-12 text-center rounded-xl border border-border/50 bg-gradient-to-br from-muted/30 to-muted/10 backdrop-blur-sm">
+          <p className="text-muted-foreground">
+            {searchQuery ? `No nodes found matching "${searchQuery}"` : "No nodes found in cluster"}
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {filteredNodes.map((node) => (
           <div
             key={node.name}
             className="border border-border rounded-lg p-4 hover:border-primary/50 transition-colors"
@@ -101,7 +146,8 @@ export function NodesList() {
               </div>
             </div>
           </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
