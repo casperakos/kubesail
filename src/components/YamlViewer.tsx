@@ -9,7 +9,7 @@ import { useAppStore } from "../lib/store";
 interface YamlViewerProps {
   resourceType: string;
   resourceName: string;
-  namespace: string;
+  namespace?: string;
   onClose: () => void;
 }
 

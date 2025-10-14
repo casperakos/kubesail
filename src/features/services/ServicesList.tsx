@@ -10,13 +10,17 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X } from "lucide-react";
+import { RefreshCw, Search, X, FileText, ArrowRightLeft } from "lucide-react";
 import { useState, useMemo } from "react";
+import { YamlViewer } from "../../components/YamlViewer";
+import { PortForwardModal } from "../../components/PortForwardModal";
 
 export function ServicesList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const { data: services, isLoading, error, refetch } = useServices(currentNamespace);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedResource, setSelectedResource] = useState<string | null>(null);
+  const [selectedServiceForPortForward, setSelectedServiceForPortForward] = useState<string | null>(null);
 
   const getTypeVariant = (type: string) => {
     switch (type) {
@@ -149,12 +153,13 @@ export function ServicesList() {
             <TableHead>External IP</TableHead>
             <TableHead>Ports</TableHead>
             <TableHead>Age</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {filteredServices.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                 {searchQuery ? `No services found matching "${searchQuery}"` : "No services found"}
               </TableCell>
             </TableRow>
@@ -177,11 +182,49 @@ export function ServicesList() {
                 {service.ports}
               </TableCell>
               <TableCell>{service.age}</TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setSelectedServiceForPortForward(service.name)}
+                    title="Port Forward"
+                  >
+                    <ArrowRightLeft className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setSelectedResource(service.name)}
+                    title="View YAML"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                </div>
+              </TableCell>
             </TableRow>
             ))
           )}
         </TableBody>
       </Table>
+
+      {selectedResource && (
+        <YamlViewer
+          resourceType="service"
+          resourceName={selectedResource}
+          namespace={currentNamespace}
+          onClose={() => setSelectedResource(null)}
+        />
+      )}
+
+      {selectedServiceForPortForward && (
+        <PortForwardModal
+          resourceType="service"
+          resourceName={selectedServiceForPortForward}
+          namespace={currentNamespace}
+          onClose={() => setSelectedServiceForPortForward(null)}
+        />
+      )}
     </div>
   );
 }

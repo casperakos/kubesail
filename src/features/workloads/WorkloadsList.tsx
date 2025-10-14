@@ -16,7 +16,8 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X } from "lucide-react";
+import { RefreshCw, Search, X, FileText } from "lucide-react";
+import { YamlViewer } from "../../components/YamlViewer";
 
 type WorkloadType = "statefulsets" | "daemonsets" | "jobs" | "cronjobs";
 
@@ -24,6 +25,7 @@ export function WorkloadsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const [activeTab, setActiveTab] = useState<WorkloadType>("statefulsets");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedResource, setSelectedResource] = useState<string | null>(null);
 
   const { data: statefulsets, isLoading: stsLoading, error: stsError, refetch: stsRefetch } =
     useStatefulSets(currentNamespace);
@@ -95,6 +97,19 @@ export function WorkloadsList() {
 
   const isLoading = stsLoading || dsLoading || jobsLoading || cjLoading;
 
+  const getResourceType = () => {
+    switch (activeTab) {
+      case "statefulsets":
+        return "statefulset";
+      case "daemonsets":
+        return "daemonset";
+      case "jobs":
+        return "job";
+      case "cronjobs":
+        return "cronjob";
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="p-6 rounded-xl border border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl shadow-lg space-y-4">
@@ -161,6 +176,7 @@ export function WorkloadsList() {
           isLoading={stsLoading}
           error={stsError}
           searchQuery={searchQuery}
+          onViewYaml={setSelectedResource}
         />
       )}
       {activeTab === "daemonsets" && (
@@ -169,6 +185,7 @@ export function WorkloadsList() {
           isLoading={dsLoading}
           error={dsError}
           searchQuery={searchQuery}
+          onViewYaml={setSelectedResource}
         />
       )}
       {activeTab === "jobs" && (
@@ -177,6 +194,7 @@ export function WorkloadsList() {
           isLoading={jobsLoading}
           error={jobsError}
           searchQuery={searchQuery}
+          onViewYaml={setSelectedResource}
         />
       )}
       {activeTab === "cronjobs" && (
@@ -185,13 +203,23 @@ export function WorkloadsList() {
           isLoading={cjLoading}
           error={cjError}
           searchQuery={searchQuery}
+          onViewYaml={setSelectedResource}
+        />
+      )}
+
+      {selectedResource && (
+        <YamlViewer
+          resourceType={getResourceType()}
+          resourceName={selectedResource}
+          namespace={currentNamespace}
+          onClose={() => setSelectedResource(null)}
         />
       )}
     </div>
   );
 }
 
-function StatefulSetsTable({ data, isLoading, error, searchQuery }: any) {
+function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
 
   if (isLoading) {
@@ -218,12 +246,13 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery }: any) {
           <TableHead>Ready</TableHead>
           <TableHead>Replicas</TableHead>
           <TableHead>Age</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {!data || data.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
               {searchQuery
                 ? `No statefulsets found matching "${searchQuery}"`
                 : `No statefulsets found in namespace "${currentNamespace}"`}
@@ -246,6 +275,15 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery }: any) {
             </TableCell>
             <TableCell>{sts.replicas}</TableCell>
             <TableCell>{sts.age}</TableCell>
+            <TableCell className="text-right">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onViewYaml(sts.name)}
+              >
+                <FileText className="w-4 h-4" />
+              </Button>
+            </TableCell>
           </TableRow>
           ))
         )}
@@ -254,7 +292,7 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery }: any) {
   );
 }
 
-function DaemonSetsTable({ data, isLoading, error, searchQuery }: any) {
+function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
 
   if (isLoading) {
@@ -284,12 +322,13 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery }: any) {
           <TableHead>Up-to-date</TableHead>
           <TableHead>Available</TableHead>
           <TableHead>Age</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {!data || data.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
               {searchQuery
                 ? `No daemonsets found matching "${searchQuery}"`
                 : `No daemonsets found in namespace "${currentNamespace}"`}
@@ -309,6 +348,15 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery }: any) {
             <TableCell>{ds.up_to_date}</TableCell>
             <TableCell>{ds.available}</TableCell>
             <TableCell>{ds.age}</TableCell>
+            <TableCell className="text-right">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onViewYaml(ds.name)}
+              >
+                <FileText className="w-4 h-4" />
+              </Button>
+            </TableCell>
           </TableRow>
           ))
         )}
@@ -317,7 +365,7 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery }: any) {
   );
 }
 
-function JobsTable({ data, isLoading, error, searchQuery }: any) {
+function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
 
   if (isLoading) {
@@ -345,12 +393,13 @@ function JobsTable({ data, isLoading, error, searchQuery }: any) {
           <TableHead>Failed</TableHead>
           <TableHead>Duration</TableHead>
           <TableHead>Age</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {!data || data.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
               {searchQuery
                 ? `No jobs found matching "${searchQuery}"`
                 : `No jobs found in namespace "${currentNamespace}"`}
@@ -378,6 +427,15 @@ function JobsTable({ data, isLoading, error, searchQuery }: any) {
             </TableCell>
             <TableCell>{job.duration}</TableCell>
             <TableCell>{job.age}</TableCell>
+            <TableCell className="text-right">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onViewYaml(job.name)}
+              >
+                <FileText className="w-4 h-4" />
+              </Button>
+            </TableCell>
           </TableRow>
           ))
         )}
@@ -386,7 +444,7 @@ function JobsTable({ data, isLoading, error, searchQuery }: any) {
   );
 }
 
-function CronJobsTable({ data, isLoading, error, searchQuery }: any) {
+function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
 
   if (isLoading) {
@@ -415,12 +473,13 @@ function CronJobsTable({ data, isLoading, error, searchQuery }: any) {
           <TableHead>Active</TableHead>
           <TableHead>Last Schedule</TableHead>
           <TableHead>Age</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {!data || data.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
               {searchQuery
                 ? `No cronjobs found matching "${searchQuery}"`
                 : `No cronjobs found in namespace "${currentNamespace}"`}
@@ -445,6 +504,15 @@ function CronJobsTable({ data, isLoading, error, searchQuery }: any) {
               {cj.last_schedule || "Never"}
             </TableCell>
             <TableCell>{cj.age}</TableCell>
+            <TableCell className="text-right">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onViewYaml(cj.name)}
+              >
+                <FileText className="w-4 h-4" />
+              </Button>
+            </TableCell>
           </TableRow>
           ))
         )}

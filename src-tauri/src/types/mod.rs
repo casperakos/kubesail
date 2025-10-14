@@ -279,3 +279,14 @@ pub struct SubjectInfo {
     pub name: String,
     pub namespace: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PortForwardInfo {
+    pub id: String,
+    pub resource_type: String,
+    pub resource_name: String,
+    pub namespace: String,
+    pub local_port: u16,
+    pub remote_port: u16,
+    pub status: String,
+}

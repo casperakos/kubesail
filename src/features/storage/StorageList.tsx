@@ -14,7 +14,8 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X } from "lucide-react";
+import { RefreshCw, Search, X, FileText } from "lucide-react";
+import { YamlViewer } from "../../components/YamlViewer";
 
 type StorageType = "pv" | "pvc";
 
@@ -22,6 +23,7 @@ export function StorageList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const [activeTab, setActiveTab] = useState<StorageType>("pvc");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedResource, setSelectedResource] = useState<string | null>(null);
 
   const { data: pvs, isLoading: pvLoading, error: pvError, refetch: pvRefetch } =
     usePersistentVolumes();
@@ -68,6 +70,10 @@ export function StorageList() {
   };
 
   const isLoading = pvLoading || pvcLoading;
+
+  const getResourceType = () => {
+    return activeTab === "pv" ? "persistentvolume" : "persistentvolumeclaim";
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -130,7 +136,13 @@ export function StorageList() {
       </div>
 
       {activeTab === "pv" && (
-        <PersistentVolumesTable data={filteredPvs} isLoading={pvLoading} error={pvError} searchQuery={searchQuery} />
+        <PersistentVolumesTable
+          data={filteredPvs}
+          isLoading={pvLoading}
+          error={pvError}
+          searchQuery={searchQuery}
+          onViewYaml={setSelectedResource}
+        />
       )}
       {activeTab === "pvc" && (
         <PersistentVolumeClaimsTable
@@ -138,13 +150,23 @@ export function StorageList() {
           isLoading={pvcLoading}
           error={pvcError}
           searchQuery={searchQuery}
+          onViewYaml={setSelectedResource}
+        />
+      )}
+
+      {selectedResource && (
+        <YamlViewer
+          resourceType={getResourceType()}
+          resourceName={selectedResource}
+          namespace={activeTab === "pvc" ? currentNamespace : undefined}
+          onClose={() => setSelectedResource(null)}
         />
       )}
     </div>
   );
 }
 
-function PersistentVolumesTable({ data, isLoading, error, searchQuery }: any) {
+function PersistentVolumesTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const getStatusVariant = (status: string) => {
     switch (status.toLowerCase()) {
       case "bound":
@@ -188,12 +210,13 @@ function PersistentVolumesTable({ data, isLoading, error, searchQuery }: any) {
           <TableHead>Claim</TableHead>
           <TableHead>Storage Class</TableHead>
           <TableHead>Age</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {!data || data.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
               {searchQuery ? `No persistent volumes found matching "${searchQuery}"` : "No persistent volumes found"}
             </TableCell>
           </TableRow>
@@ -224,6 +247,15 @@ function PersistentVolumesTable({ data, isLoading, error, searchQuery }: any) {
               {pv.storage_class || "-"}
             </TableCell>
             <TableCell>{pv.age}</TableCell>
+            <TableCell className="text-right">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onViewYaml(pv.name)}
+              >
+                <FileText className="w-4 h-4" />
+              </Button>
+            </TableCell>
           </TableRow>
           ))
         )}
@@ -232,7 +264,7 @@ function PersistentVolumesTable({ data, isLoading, error, searchQuery }: any) {
   );
 }
 
-function PersistentVolumeClaimsTable({ data, isLoading, error, searchQuery }: any) {
+function PersistentVolumeClaimsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
 
   const getStatusVariant = (status: string) => {
@@ -275,12 +307,13 @@ function PersistentVolumeClaimsTable({ data, isLoading, error, searchQuery }: an
           <TableHead>Access Modes</TableHead>
           <TableHead>Storage Class</TableHead>
           <TableHead>Age</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {!data || data.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
               {searchQuery
                 ? `No persistent volume claims found matching "${searchQuery}"`
                 : `No persistent volume claims found in namespace "${currentNamespace}"`}
@@ -310,6 +343,15 @@ function PersistentVolumeClaimsTable({ data, isLoading, error, searchQuery }: an
               {pvc.storage_class || "-"}
             </TableCell>
             <TableCell>{pvc.age}</TableCell>
+            <TableCell className="text-right">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onViewYaml(pvc.name)}
+              >
+                <FileText className="w-4 h-4" />
+              </Button>
+            </TableCell>
           </TableRow>
           ))
         )}

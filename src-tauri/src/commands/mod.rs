@@ -216,7 +216,7 @@ pub async fn get_istio_gateways(
 #[tauri::command]
 pub async fn get_resource_yaml(
     resource_type: String,
-    namespace: String,
+    namespace: Option<String>,
     name: String,
     client_manager: State<'_, KubeClientManager>,
 ) -> Result<String, String> {
@@ -225,7 +225,7 @@ pub async fn get_resource_yaml(
         .await
         .map_err(|e| e.to_string())?;
 
-    crate::kube::get_resource_yaml(client, &resource_type, &namespace, &name)
+    crate::kube::get_resource_yaml(client, &resource_type, namespace.as_deref().unwrap_or(""), &name)
         .await
         .map_err(|e| e.to_string())
 }
@@ -455,7 +455,7 @@ pub async fn get_service_accounts(
 #[tauri::command]
 pub async fn apply_resource_yaml(
     resource_type: String,
-    namespace: String,
+    namespace: Option<String>,
     yaml_content: String,
     client_manager: State<'_, KubeClientManager>,
 ) -> Result<(), String> {
@@ -464,7 +464,41 @@ pub async fn apply_resource_yaml(
         .await
         .map_err(|e| e.to_string())?;
 
-    crate::kube::apply_resource_yaml(client, &resource_type, &namespace, &yaml_content)
+    crate::kube::apply_resource_yaml(client, &resource_type, namespace.as_deref().unwrap_or(""), &yaml_content)
         .await
         .map_err(|e| e.to_string())
+}
+
+// Port Forward Commands
+#[tauri::command]
+pub async fn start_port_forward(
+    resource_type: String,
+    resource_name: String,
+    namespace: String,
+    local_port: u16,
+    remote_port: u16,
+    portforward_manager: State<'_, crate::portforward::PortForwardManager>,
+) -> Result<crate::types::PortForwardInfo, String> {
+    portforward_manager
+        .start_port_forward(&resource_type, &resource_name, &namespace, local_port, remote_port)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn stop_port_forward(
+    id: String,
+    portforward_manager: State<'_, crate::portforward::PortForwardManager>,
+) -> Result<(), String> {
+    portforward_manager
+        .stop_port_forward(&id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn list_port_forwards(
+    portforward_manager: State<'_, crate::portforward::PortForwardManager>,
+) -> Result<Vec<crate::types::PortForwardInfo>, String> {
+    Ok(portforward_manager.list_port_forwards().await)
 }

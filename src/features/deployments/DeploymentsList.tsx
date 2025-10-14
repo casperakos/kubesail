@@ -10,8 +10,9 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X } from "lucide-react";
+import { RefreshCw, Search, X, FileText } from "lucide-react";
 import { useState, useMemo } from "react";
+import { YamlViewer } from "../../components/YamlViewer";
 
 export function DeploymentsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
@@ -19,6 +20,7 @@ export function DeploymentsList() {
   const scaleDeployment = useScaleDeployment();
   const [scalingDeployment, setScalingDeployment] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDeployment, setSelectedDeployment] = useState<string | null>(null);
 
   const handleScale = (deploymentName: string, currentReplicas: number) => {
     const newReplicas = window.prompt(
@@ -183,14 +185,23 @@ export function DeploymentsList() {
                 <TableCell>{deployment.available}</TableCell>
                 <TableCell>{deployment.age}</TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleScale(deployment.name, total)}
-                    disabled={scalingDeployment === deployment.name}
-                  >
-                    Scale
-                  </Button>
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedDeployment(deployment.name)}
+                    >
+                      <FileText className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleScale(deployment.name, total)}
+                      disabled={scalingDeployment === deployment.name}
+                    >
+                      Scale
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             );
@@ -198,6 +209,15 @@ export function DeploymentsList() {
           )}
         </TableBody>
       </Table>
+
+      {selectedDeployment && (
+        <YamlViewer
+          resourceType="deployment"
+          resourceName={selectedDeployment}
+          namespace={currentNamespace}
+          onClose={() => setSelectedDeployment(null)}
+        />
+      )}
     </div>
   );
 }

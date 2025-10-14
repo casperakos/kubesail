@@ -10,14 +10,16 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Shield, Globe, Search, X } from "lucide-react";
+import { RefreshCw, Shield, Globe, Search, X, FileText } from "lucide-react";
 import { IngressInfo } from "../../types";
 import { useState, useMemo } from "react";
+import { YamlViewer } from "../../components/YamlViewer";
 
 export function IngressesList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const { data: ingresses, isLoading, error, refetch } = useIngresses(currentNamespace);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedResource, setSelectedResource] = useState<string | null>(null);
 
   const getIngressClassVariant = (className?: string) => {
     if (!className) return "secondary";
@@ -151,12 +153,13 @@ export function IngressesList() {
             <TableHead>Addresses</TableHead>
             <TableHead>TLS</TableHead>
             <TableHead>Age</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {filteredIngresses.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                 {searchQuery ? `No ingresses found matching "${searchQuery}"` : "No ingresses found"}
               </TableCell>
             </TableRow>
@@ -211,11 +214,29 @@ export function IngressesList() {
                 )}
               </TableCell>
               <TableCell>{ingress.age}</TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedResource(ingress.name)}
+                >
+                  <FileText className="w-4 h-4" />
+                </Button>
+              </TableCell>
             </TableRow>
             ))
           )}
         </TableBody>
       </Table>
+
+      {selectedResource && (
+        <YamlViewer
+          resourceType="ingress"
+          resourceName={selectedResource}
+          namespace={currentNamespace}
+          onClose={() => setSelectedResource(null)}
+        />
+      )}
     </div>
   );
 }

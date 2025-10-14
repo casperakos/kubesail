@@ -260,6 +260,16 @@ export interface ClusterMetrics {
   memory_usage_percent?: number;
 }
 
+export interface PortForwardInfo {
+  id: string;
+  resource_type: string;
+  resource_name: string;
+  namespace: string;
+  local_port: number;
+  remote_port: number;
+  status: string;
+}
+
 export interface AppState {
   currentContext?: string;
   currentNamespace: string;

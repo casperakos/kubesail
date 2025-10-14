@@ -22,6 +22,7 @@ import type {
   ClusterRoleInfo,
   ClusterRoleBindingInfo,
   ServiceAccountInfo,
+  PortForwardInfo,
 } from "../types";
 
 export const api = {
@@ -105,7 +106,7 @@ export const api = {
   // YAML operations
   async getResourceYaml(
     resourceType: string,
-    namespace: string,
+    namespace: string | undefined,
     name: string
   ): Promise<string> {
     return await invoke("get_resource_yaml", {
@@ -190,7 +191,7 @@ export const api = {
 
   async applyResourceYaml(
     resourceType: string,
-    namespace: string,
+    namespace: string | undefined,
     yamlContent: string
   ): Promise<void> {
     return await invoke("apply_resource_yaml", {
@@ -198,5 +199,30 @@ export const api = {
       namespace,
       yamlContent,
     });
+  },
+
+  // Port Forward operations
+  async startPortForward(
+    resourceType: string,
+    resourceName: string,
+    namespace: string,
+    localPort: number,
+    remotePort: number
+  ): Promise<PortForwardInfo> {
+    return await invoke("start_port_forward", {
+      resourceType,
+      resourceName,
+      namespace,
+      localPort,
+      remotePort,
+    });
+  },
+
+  async stopPortForward(id: string): Promise<void> {
+    return await invoke("stop_port_forward", { id });
+  },
+
+  async listPortForwards(): Promise<PortForwardInfo[]> {
+    return await invoke("list_port_forwards");
   },
 };

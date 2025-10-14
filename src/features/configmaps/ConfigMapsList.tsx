@@ -11,14 +11,16 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Eye, Search, X } from "lucide-react";
+import { RefreshCw, Eye, Search, X, FileText } from "lucide-react";
 import { ConfigMapInfo } from "../../types";
+import { YamlViewer } from "../../components/YamlViewer";
 
 export function ConfigMapsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const { data: configmaps, isLoading, error, refetch } = useConfigMaps(currentNamespace);
   const [selectedConfigMap, setSelectedConfigMap] = useState<ConfigMapInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedResource, setSelectedResource] = useState<string | null>(null);
 
   // Filter configmaps based on search query
   const filteredConfigMaps = useMemo(() => {
@@ -125,20 +127,38 @@ export function ConfigMapsList() {
               </TableCell>
               <TableCell>{cm.age}</TableCell>
               <TableCell className="text-right">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setSelectedConfigMap(cm)}
-                  title="View data"
-                >
-                  <Eye className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedResource(cm.name)}
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setSelectedConfigMap(cm)}
+                    title="View data"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
             ))
           )}
         </TableBody>
       </Table>
+
+      {selectedResource && (
+        <YamlViewer
+          resourceType="configmap"
+          resourceName={selectedResource}
+          namespace={currentNamespace}
+          onClose={() => setSelectedResource(null)}
+        />
+      )}
 
       {selectedConfigMap && (
         <ConfigMapViewer

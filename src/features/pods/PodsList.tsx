@@ -11,9 +11,10 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { Trash2, RefreshCw, FileText, Code, Search, X } from "lucide-react";
+import { Trash2, RefreshCw, FileText, Code, Search, X, ArrowRightLeft } from "lucide-react";
 import { LogsViewer } from "../logs/LogsViewer";
 import { YamlViewer } from "../../components/YamlViewer";
+import { PortForwardModal } from "../../components/PortForwardModal";
 
 export function PodsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
@@ -23,6 +24,9 @@ export function PodsList() {
     null
   );
   const [selectedPodForYaml, setSelectedPodForYaml] = useState<string | null>(
+    null
+  );
+  const [selectedPodForPortForward, setSelectedPodForPortForward] = useState<string | null>(
     null
   );
   const [searchQuery, setSearchQuery] = useState("");
@@ -198,6 +202,14 @@ export function PodsList() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    onClick={() => setSelectedPodForPortForward(pod.name)}
+                    title="Port Forward"
+                  >
+                    <ArrowRightLeft className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setSelectedPodForYaml(pod.name)}
                     title="View YAML"
                   >
@@ -242,6 +254,15 @@ export function PodsList() {
           resourceName={selectedPodForYaml}
           namespace={currentNamespace}
           onClose={() => setSelectedPodForYaml(null)}
+        />
+      )}
+
+      {selectedPodForPortForward && (
+        <PortForwardModal
+          resourceType="pod"
+          resourceName={selectedPodForPortForward}
+          namespace={currentNamespace}
+          onClose={() => setSelectedPodForPortForward(null)}
         />
       )}
     </div>

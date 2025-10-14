@@ -534,7 +534,7 @@ pub async fn get_resource_yaml(
     namespace: &str,
     name: &str,
 ) -> Result<String> {
-    let yaml = match resource_type {
+    let yaml = match resource_type.to_lowercase().as_str() {
         "pod" => {
             let pods: Api<Pod> = Api::namespaced(client, namespace);
             let pod = pods.get(name).await?;
@@ -550,10 +550,75 @@ pub async fn get_resource_yaml(
             let service = services.get(name).await?;
             serde_yaml::to_string(&service)?
         }
+        "configmap" => {
+            let configmaps: Api<ConfigMap> = Api::namespaced(client, namespace);
+            let cm = configmaps.get(name).await?;
+            serde_yaml::to_string(&cm)?
+        }
+        "secret" => {
+            let secrets: Api<Secret> = Api::namespaced(client, namespace);
+            let secret = secrets.get(name).await?;
+            serde_yaml::to_string(&secret)?
+        }
+        "statefulset" => {
+            let statefulsets: Api<StatefulSet> = Api::namespaced(client, namespace);
+            let sts = statefulsets.get(name).await?;
+            serde_yaml::to_string(&sts)?
+        }
+        "daemonset" => {
+            let daemonsets: Api<DaemonSet> = Api::namespaced(client, namespace);
+            let ds = daemonsets.get(name).await?;
+            serde_yaml::to_string(&ds)?
+        }
+        "job" => {
+            let jobs: Api<Job> = Api::namespaced(client, namespace);
+            let job = jobs.get(name).await?;
+            serde_yaml::to_string(&job)?
+        }
+        "cronjob" => {
+            let cronjobs: Api<CronJob> = Api::namespaced(client, namespace);
+            let cj = cronjobs.get(name).await?;
+            serde_yaml::to_string(&cj)?
+        }
         "ingress" => {
             let ingresses: Api<Ingress> = Api::namespaced(client, namespace);
             let ingress = ingresses.get(name).await?;
             serde_yaml::to_string(&ingress)?
+        }
+        "persistentvolume" | "pv" => {
+            let pvs: Api<PersistentVolume> = Api::all(client);
+            let pv = pvs.get(name).await?;
+            serde_yaml::to_string(&pv)?
+        }
+        "persistentvolumeclaim" | "pvc" => {
+            let pvcs: Api<PersistentVolumeClaim> = Api::namespaced(client, namespace);
+            let pvc = pvcs.get(name).await?;
+            serde_yaml::to_string(&pvc)?
+        }
+        "role" => {
+            let roles: Api<Role> = Api::namespaced(client, namespace);
+            let role = roles.get(name).await?;
+            serde_yaml::to_string(&role)?
+        }
+        "rolebinding" => {
+            let rbs: Api<RoleBinding> = Api::namespaced(client, namespace);
+            let rb = rbs.get(name).await?;
+            serde_yaml::to_string(&rb)?
+        }
+        "clusterrole" => {
+            let crs: Api<ClusterRole> = Api::all(client);
+            let cr = crs.get(name).await?;
+            serde_yaml::to_string(&cr)?
+        }
+        "clusterrolebinding" => {
+            let crbs: Api<ClusterRoleBinding> = Api::all(client);
+            let crb = crbs.get(name).await?;
+            serde_yaml::to_string(&crb)?
+        }
+        "serviceaccount" => {
+            let sas: Api<ServiceAccount> = Api::namespaced(client, namespace);
+            let sa = sas.get(name).await?;
+            serde_yaml::to_string(&sa)?
         }
         _ => return Err(anyhow::anyhow!("Unsupported resource type: {}", resource_type)),
     };

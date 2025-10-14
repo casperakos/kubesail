@@ -11,14 +11,16 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Eye, EyeOff, Search, X } from "lucide-react";
+import { RefreshCw, Eye, EyeOff, Search, X, FileText } from "lucide-react";
 import { SecretInfo } from "../../types";
+import { YamlViewer } from "../../components/YamlViewer";
 
 export function SecretsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const { data: secrets, isLoading, error, refetch } = useSecrets(currentNamespace);
   const [selectedSecret, setSelectedSecret] = useState<SecretInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedResource, setSelectedResource] = useState<string | null>(null);
 
   const getTypeVariant = (type: string) => {
     if (type.includes("tls")) return "success";
@@ -138,20 +140,38 @@ export function SecretsList() {
               </TableCell>
               <TableCell>{secret.age}</TableCell>
               <TableCell className="text-right">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setSelectedSecret(secret)}
-                  title="View secret data"
-                >
-                  <Eye className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedResource(secret.name)}
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setSelectedSecret(secret)}
+                    title="View secret data"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
             ))
           )}
         </TableBody>
       </Table>
+
+      {selectedResource && (
+        <YamlViewer
+          resourceType="secret"
+          resourceName={selectedResource}
+          namespace={currentNamespace}
+          onClose={() => setSelectedResource(null)}
+        />
+      )}
 
       {selectedSecret && (
         <SecretViewer

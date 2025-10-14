@@ -17,7 +17,8 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X } from "lucide-react";
+import { RefreshCw, Search, X, FileText } from "lucide-react";
+import { YamlViewer } from "../../components/YamlViewer";
 import type {
   RoleInfo,
   RoleBindingInfo,
@@ -33,6 +34,7 @@ export function RBACList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const [activeTab, setActiveTab] = useState<RBACType>("roles");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedResource, setSelectedResource] = useState<string | null>(null);
 
   const { data: roles, isLoading: rolesLoading, error: rolesError, refetch: rolesRefetch } =
     useRoles(currentNamespace);
@@ -132,6 +134,23 @@ export function RBACList() {
   const isLoading = rolesLoading || roleBindingsLoading || clusterRolesLoading ||
                     clusterRoleBindingsLoading || serviceAccountsLoading;
 
+  const getResourceType = () => {
+    switch (activeTab) {
+      case "roles":
+        return "role";
+      case "rolebindings":
+        return "rolebinding";
+      case "clusterroles":
+        return "clusterrole";
+      case "clusterrolebindings":
+        return "clusterrolebinding";
+      case "serviceaccounts":
+        return "serviceaccount";
+    }
+  };
+
+  const isClusterScoped = activeTab === "clusterroles" || activeTab === "clusterrolebindings";
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="p-6 rounded-xl border border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl shadow-lg space-y-4">
@@ -193,25 +212,64 @@ export function RBACList() {
       </div>
 
       {activeTab === "roles" && (
-        <RolesTable data={filteredRoles} isLoading={rolesLoading} error={rolesError} searchQuery={searchQuery} />
+        <RolesTable
+          data={filteredRoles}
+          isLoading={rolesLoading}
+          error={rolesError}
+          searchQuery={searchQuery}
+          onViewYaml={setSelectedResource}
+        />
       )}
       {activeTab === "rolebindings" && (
-        <RoleBindingsTable data={filteredRoleBindings} isLoading={roleBindingsLoading} error={roleBindingsError} searchQuery={searchQuery} />
+        <RoleBindingsTable
+          data={filteredRoleBindings}
+          isLoading={roleBindingsLoading}
+          error={roleBindingsError}
+          searchQuery={searchQuery}
+          onViewYaml={setSelectedResource}
+        />
       )}
       {activeTab === "clusterroles" && (
-        <ClusterRolesTable data={filteredClusterRoles} isLoading={clusterRolesLoading} error={clusterRolesError} searchQuery={searchQuery} />
+        <ClusterRolesTable
+          data={filteredClusterRoles}
+          isLoading={clusterRolesLoading}
+          error={clusterRolesError}
+          searchQuery={searchQuery}
+          onViewYaml={setSelectedResource}
+        />
       )}
       {activeTab === "clusterrolebindings" && (
-        <ClusterRoleBindingsTable data={filteredClusterRoleBindings} isLoading={clusterRoleBindingsLoading} error={clusterRoleBindingsError} searchQuery={searchQuery} />
+        <ClusterRoleBindingsTable
+          data={filteredClusterRoleBindings}
+          isLoading={clusterRoleBindingsLoading}
+          error={clusterRoleBindingsError}
+          searchQuery={searchQuery}
+          onViewYaml={setSelectedResource}
+        />
       )}
       {activeTab === "serviceaccounts" && (
-        <ServiceAccountsTable data={filteredServiceAccounts} isLoading={serviceAccountsLoading} error={serviceAccountsError} searchQuery={searchQuery} />
+        <ServiceAccountsTable
+          data={filteredServiceAccounts}
+          isLoading={serviceAccountsLoading}
+          error={serviceAccountsError}
+          searchQuery={searchQuery}
+          onViewYaml={setSelectedResource}
+        />
+      )}
+
+      {selectedResource && (
+        <YamlViewer
+          resourceType={getResourceType()}
+          resourceName={selectedResource}
+          namespace={isClusterScoped ? undefined : currentNamespace}
+          onClose={() => setSelectedResource(null)}
+        />
       )}
     </div>
   );
 }
 
-function RolesTable({ data, isLoading, error, searchQuery }: { data: RoleInfo[]; isLoading: boolean; error: any; searchQuery: string }) {
+function RolesTable({ data, isLoading, error, searchQuery, onViewYaml }: { data: RoleInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void }) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
 
   if (isLoading) {
@@ -238,12 +296,13 @@ function RolesTable({ data, isLoading, error, searchQuery }: { data: RoleInfo[];
           <TableHead>Namespace</TableHead>
           <TableHead>Rules</TableHead>
           <TableHead>Age</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {!data || data.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
               {searchQuery
                 ? `No roles found matching "${searchQuery}"`
                 : `No roles found in namespace "${currentNamespace}"`}
@@ -258,6 +317,15 @@ function RolesTable({ data, isLoading, error, searchQuery }: { data: RoleInfo[];
                 <Badge variant="secondary">{role.rules_count}</Badge>
               </TableCell>
               <TableCell>{role.age}</TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onViewYaml(role.name)}
+                >
+                  <FileText className="w-4 h-4" />
+                </Button>
+              </TableCell>
             </TableRow>
           ))
         )}
@@ -266,7 +334,7 @@ function RolesTable({ data, isLoading, error, searchQuery }: { data: RoleInfo[];
   );
 }
 
-function RoleBindingsTable({ data, isLoading, error, searchQuery }: { data: RoleBindingInfo[]; isLoading: boolean; error: any; searchQuery: string }) {
+function RoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml }: { data: RoleBindingInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void }) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
 
   if (isLoading) {
@@ -294,12 +362,13 @@ function RoleBindingsTable({ data, isLoading, error, searchQuery }: { data: Role
           <TableHead>Role</TableHead>
           <TableHead>Subjects</TableHead>
           <TableHead>Age</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {!data || data.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
               {searchQuery
                 ? `No role bindings found matching "${searchQuery}"`
                 : `No role bindings found in namespace "${currentNamespace}"`}
@@ -326,6 +395,15 @@ function RoleBindingsTable({ data, isLoading, error, searchQuery }: { data: Role
                 </div>
               </TableCell>
               <TableCell>{rb.age}</TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onViewYaml(rb.name)}
+                >
+                  <FileText className="w-4 h-4" />
+                </Button>
+              </TableCell>
             </TableRow>
           ))
         )}
@@ -334,7 +412,7 @@ function RoleBindingsTable({ data, isLoading, error, searchQuery }: { data: Role
   );
 }
 
-function ClusterRolesTable({ data, isLoading, error, searchQuery }: { data: ClusterRoleInfo[]; isLoading: boolean; error: any; searchQuery: string }) {
+function ClusterRolesTable({ data, isLoading, error, searchQuery, onViewYaml }: { data: ClusterRoleInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -358,12 +436,13 @@ function ClusterRolesTable({ data, isLoading, error, searchQuery }: { data: Clus
           <TableHead>Name</TableHead>
           <TableHead>Rules</TableHead>
           <TableHead>Age</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {!data || data.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
               {searchQuery ? `No cluster roles found matching "${searchQuery}"` : "No cluster roles found"}
             </TableCell>
           </TableRow>
@@ -375,6 +454,15 @@ function ClusterRolesTable({ data, isLoading, error, searchQuery }: { data: Clus
                 <Badge variant="secondary">{cr.rules_count}</Badge>
               </TableCell>
               <TableCell>{cr.age}</TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onViewYaml(cr.name)}
+                >
+                  <FileText className="w-4 h-4" />
+                </Button>
+              </TableCell>
             </TableRow>
           ))
         )}
@@ -383,7 +471,7 @@ function ClusterRolesTable({ data, isLoading, error, searchQuery }: { data: Clus
   );
 }
 
-function ClusterRoleBindingsTable({ data, isLoading, error, searchQuery }: { data: ClusterRoleBindingInfo[]; isLoading: boolean; error: any; searchQuery: string }) {
+function ClusterRoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml }: { data: ClusterRoleBindingInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -408,12 +496,13 @@ function ClusterRoleBindingsTable({ data, isLoading, error, searchQuery }: { dat
           <TableHead>Role</TableHead>
           <TableHead>Subjects</TableHead>
           <TableHead>Age</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {!data || data.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
               {searchQuery ? `No cluster role bindings found matching "${searchQuery}"` : "No cluster role bindings found"}
             </TableCell>
           </TableRow>
@@ -434,6 +523,15 @@ function ClusterRoleBindingsTable({ data, isLoading, error, searchQuery }: { dat
                 </div>
               </TableCell>
               <TableCell>{crb.age}</TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onViewYaml(crb.name)}
+                >
+                  <FileText className="w-4 h-4" />
+                </Button>
+              </TableCell>
             </TableRow>
           ))
         )}
@@ -442,7 +540,7 @@ function ClusterRoleBindingsTable({ data, isLoading, error, searchQuery }: { dat
   );
 }
 
-function ServiceAccountsTable({ data, isLoading, error, searchQuery }: { data: ServiceAccountInfo[]; isLoading: boolean; error: any; searchQuery: string }) {
+function ServiceAccountsTable({ data, isLoading, error, searchQuery, onViewYaml }: { data: ServiceAccountInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void }) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
 
   if (isLoading) {
@@ -469,12 +567,13 @@ function ServiceAccountsTable({ data, isLoading, error, searchQuery }: { data: S
           <TableHead>Namespace</TableHead>
           <TableHead>Secrets</TableHead>
           <TableHead>Age</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {!data || data.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
               {searchQuery
                 ? `No service accounts found matching "${searchQuery}"`
                 : `No service accounts found in namespace "${currentNamespace}"`}
@@ -489,6 +588,15 @@ function ServiceAccountsTable({ data, isLoading, error, searchQuery }: { data: S
                 <Badge variant="secondary">{sa.secrets}</Badge>
               </TableCell>
               <TableCell>{sa.age}</TableCell>
+              <TableCell className="text-right">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onViewYaml(sa.name)}
+                >
+                  <FileText className="w-4 h-4" />
+                </Button>
+              </TableCell>
             </TableRow>
           ))
         )}
