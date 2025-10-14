@@ -646,6 +646,39 @@ pub async fn delete_job(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn suspend_cronjob(
+    namespace: String,
+    cronjob_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager.get_client().await.map_err(|e| e.to_string())?;
+    crate::kube::suspend_cronjob(client, &namespace, &cronjob_name)
+        .await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn resume_cronjob(
+    namespace: String,
+    cronjob_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager.get_client().await.map_err(|e| e.to_string())?;
+    crate::kube::resume_cronjob(client, &namespace, &cronjob_name)
+        .await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_cronjob(
+    namespace: String,
+    cronjob_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager.get_client().await.map_err(|e| e.to_string())?;
+    crate::kube::delete_cronjob(client, &namespace, &cronjob_name)
+        .await.map_err(|e| e.to_string())
+}
+
 // Port Forward Commands
 #[tauri::command]
 pub async fn start_port_forward(

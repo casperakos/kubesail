@@ -10,6 +10,9 @@ import {
   useRestartDaemonSet,
   useDeleteDaemonSet,
   useDeleteJob,
+  useSuspendCronJob,
+  useResumeCronJob,
+  useDeleteCronJob,
 } from "../../hooks/useKube";
 import { useAppStore } from "../../lib/store";
 import {
@@ -22,7 +25,7 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, FileText, RotateCw, Trash2 } from "lucide-react";
+import { RefreshCw, Search, X, FileText, RotateCw, Trash2, Pause, Play } from "lucide-react";
 import { YamlViewer } from "../../components/YamlViewer";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
@@ -845,6 +848,78 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
 
 function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const suspendCronJob = useSuspendCronJob();
+  const resumeCronJob = useResumeCronJob();
+  const deleteCronJob = useDeleteCronJob();
+  const [suspendingCronJob, setSuspendingCronJob] = useState<string | null>(null);
+  const [resumingCronJob, setResumingCronJob] = useState<string | null>(null);
+  const [cronjobToDelete, setCronjobToDelete] = useState<string | null>(null);
+  const [cronjobToSuspend, setCronjobToSuspend] = useState<string | null>(null);
+  const [cronjobToResume, setCronjobToResume] = useState<string | null>(null);
+
+  const handleSuspendCronJob = (cronjobName: string) => {
+    setCronjobToSuspend(cronjobName);
+  };
+
+  const confirmSuspendCronJob = async () => {
+    if (cronjobToSuspend) {
+      setSuspendingCronJob(cronjobToSuspend);
+      try {
+        await suspendCronJob.mutateAsync({
+          namespace: currentNamespace,
+          cronjobName: cronjobToSuspend,
+        });
+      } finally {
+        setSuspendingCronJob(null);
+      }
+      setCronjobToSuspend(null);
+    }
+  };
+
+  const cancelSuspendCronJob = () => {
+    setCronjobToSuspend(null);
+  };
+
+  const handleResumeCronJob = (cronjobName: string) => {
+    setCronjobToResume(cronjobName);
+  };
+
+  const confirmResumeCronJob = async () => {
+    if (cronjobToResume) {
+      setResumingCronJob(cronjobToResume);
+      try {
+        await resumeCronJob.mutateAsync({
+          namespace: currentNamespace,
+          cronjobName: cronjobToResume,
+        });
+      } finally {
+        setResumingCronJob(null);
+      }
+      setCronjobToResume(null);
+    }
+  };
+
+  const cancelResumeCronJob = () => {
+    setCronjobToResume(null);
+  };
+
+  const handleDeleteCronJob = (cronjobName: string) => {
+    setCronjobToDelete(cronjobName);
+  };
+
+  const confirmDeleteCronJob = () => {
+    if (cronjobToDelete) {
+      deleteCronJob.mutate({
+        namespace: currentNamespace,
+        cronjobName: cronjobToDelete,
+      });
+      setCronjobToDelete(null);
+    }
+  };
+
+  const cancelDeleteCronJob = () => {
+    setCronjobToDelete(null);
+  };
 
   if (isLoading) {
     return (
@@ -863,59 +938,168 @@ function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any)
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Schedule</TableHead>
-          <TableHead>Suspend</TableHead>
-          <TableHead>Active</TableHead>
-          <TableHead>Last Schedule</TableHead>
-          <TableHead>Age</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {!data || data.length === 0 ? (
+    <>
+      <Table>
+        <TableHeader>
           <TableRow>
-            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-              {searchQuery
-                ? `No cronjobs found matching "${searchQuery}"`
-                : `No cronjobs found in namespace "${currentNamespace}"`}
-            </TableCell>
+            <TableHead>Name</TableHead>
+            <TableHead>Schedule</TableHead>
+            <TableHead>Suspended</TableHead>
+            <TableHead>Active</TableHead>
+            <TableHead>Last Schedule</TableHead>
+            <TableHead>Age</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
-        ) : (
-          data.map((cj: any) => (
-          <TableRow key={cj.name}>
-            <TableCell className="font-medium">{cj.name}</TableCell>
-            <TableCell>
-              <code className="text-sm bg-muted px-2 py-1 rounded">
-                {cj.schedule}
-              </code>
-            </TableCell>
-            <TableCell>
-              {cj.suspend && <Badge variant="warning">Suspended</Badge>}
-            </TableCell>
-            <TableCell>
-              {cj.active > 0 && <Badge variant="success">{cj.active}</Badge>}
-            </TableCell>
-            <TableCell className="text-muted-foreground">
-              {cj.last_schedule || "Never"}
-            </TableCell>
-            <TableCell>{cj.age}</TableCell>
-            <TableCell className="text-right">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onViewYaml(cj.name)}
-              >
-                <FileText className="w-4 h-4" />
+        </TableHeader>
+        <TableBody>
+          {!data || data.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                {searchQuery
+                  ? `No cronjobs found matching "${searchQuery}"`
+                  : `No cronjobs found in namespace "${currentNamespace}"`}
+              </TableCell>
+            </TableRow>
+          ) : (
+            data.map((cj: any) => (
+            <TableRow key={cj.name}>
+              <TableCell className="font-medium">{cj.name}</TableCell>
+              <TableCell>
+                <code className="text-sm bg-muted px-2 py-1 rounded">
+                  {cj.schedule}
+                </code>
+              </TableCell>
+              <TableCell>
+                <Badge variant={cj.suspend ? "warning" : "success"}>
+                  {cj.suspend ? "Yes" : "No"}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                {cj.active > 0 && <Badge variant="success">{cj.active}</Badge>}
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {cj.last_schedule || "Never"}
+              </TableCell>
+              <TableCell>{cj.age}</TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onViewYaml(cj.name)}
+                    title="View YAML"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                  {cj.suspend ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleResumeCronJob(cj.name)}
+                      disabled={resumingCronJob === cj.name}
+                      title="Resume cronjob"
+                    >
+                      <Play className={`w-4 h-4 mr-2 ${resumingCronJob === cj.name ? "animate-pulse" : ""}`} />
+                      Resume
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSuspendCronJob(cj.name)}
+                      disabled={suspendingCronJob === cj.name}
+                      title="Suspend cronjob"
+                    >
+                      <Pause className={`w-4 h-4 mr-2 ${suspendingCronJob === cj.name ? "animate-pulse" : ""}`} />
+                      Suspend
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteCronJob(cj.name)}
+                    disabled={deleteCronJob.isPending}
+                    title="Delete cronjob"
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+
+      {/* Suspend Confirmation Dialog */}
+      {cronjobToSuspend && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Suspend</h3>
+            <p className="text-muted-foreground mb-6">
+              Are you sure you want to suspend cronjob <span className="font-mono text-foreground">"{cronjobToSuspend}"</span>? This will prevent new job executions until resumed.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelSuspendCronJob}>
+                Cancel
               </Button>
-            </TableCell>
-          </TableRow>
-          ))
-        )}
-      </TableBody>
-    </Table>
+              <Button
+                onClick={confirmSuspendCronJob}
+                disabled={suspendCronJob.isPending}
+              >
+                {suspendCronJob.isPending ? "Suspending..." : "Suspend"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resume Confirmation Dialog */}
+      {cronjobToResume && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Resume</h3>
+            <p className="text-muted-foreground mb-6">
+              Are you sure you want to resume cronjob <span className="font-mono text-foreground">"{cronjobToResume}"</span>? This will allow new job executions according to the schedule.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelResumeCronJob}>
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmResumeCronJob}
+                disabled={resumeCronJob.isPending}
+              >
+                {resumeCronJob.isPending ? "Resuming..." : "Resume"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {cronjobToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Deletion</h3>
+            <p className="text-muted-foreground mb-6">
+              Are you sure you want to delete cronjob <span className="font-mono text-foreground">"{cronjobToDelete}"</span>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelDeleteCronJob}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDeleteCronJob}
+                disabled={deleteCronJob.isPending}
+              >
+                {deleteCronJob.isPending ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

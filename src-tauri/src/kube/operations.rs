@@ -505,6 +505,54 @@ pub async fn delete_job(
     Ok(())
 }
 
+pub async fn suspend_cronjob(
+    client: Client,
+    namespace: &str,
+    cronjob_name: &str,
+) -> Result<()> {
+    let cronjobs: Api<CronJob> = Api::namespaced(client, namespace);
+    let patch = serde_json::json!({
+        "spec": {
+            "suspend": true
+        }
+    });
+    cronjobs.patch(
+        cronjob_name,
+        &kube::api::PatchParams::default(),
+        &kube::api::Patch::Strategic(&patch),
+    ).await?;
+    Ok(())
+}
+
+pub async fn resume_cronjob(
+    client: Client,
+    namespace: &str,
+    cronjob_name: &str,
+) -> Result<()> {
+    let cronjobs: Api<CronJob> = Api::namespaced(client, namespace);
+    let patch = serde_json::json!({
+        "spec": {
+            "suspend": false
+        }
+    });
+    cronjobs.patch(
+        cronjob_name,
+        &kube::api::PatchParams::default(),
+        &kube::api::Patch::Strategic(&patch),
+    ).await?;
+    Ok(())
+}
+
+pub async fn delete_cronjob(
+    client: Client,
+    namespace: &str,
+    cronjob_name: &str,
+) -> Result<()> {
+    let cronjobs: Api<CronJob> = Api::namespaced(client, namespace);
+    cronjobs.delete(cronjob_name, &Default::default()).await?;
+    Ok(())
+}
+
 fn format_age(timestamp: &DateTime<Utc>) -> String {
     let now = SystemTime::now();
     let now: DateTime<Utc> = now.into();

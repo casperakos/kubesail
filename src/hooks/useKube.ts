@@ -440,6 +440,87 @@ export function useCronJobs(namespace: string) {
   });
 }
 
+export function useSuspendCronJob() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      namespace,
+      cronjobName,
+    }: {
+      namespace: string;
+      cronjobName: string;
+    }) => {
+      console.log("useSuspendCronJob mutationFn called with:", { namespace, cronjobName });
+      return api.suspendCronJob(namespace, cronjobName);
+    },
+    onSuccess: (_, variables) => {
+      console.log("Suspend cronjob successful, invalidating queries");
+      queryClient.invalidateQueries({
+        queryKey: ["cronjobs", variables.namespace],
+      });
+    },
+    onError: (error) => {
+      console.error("Failed to suspend cronjob:", error);
+      alert(`Failed to suspend cronjob: ${error instanceof Error ? error.message : String(error)}`);
+    },
+  });
+}
+
+export function useResumeCronJob() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      namespace,
+      cronjobName,
+    }: {
+      namespace: string;
+      cronjobName: string;
+    }) => {
+      console.log("useResumeCronJob mutationFn called with:", { namespace, cronjobName });
+      return api.resumeCronJob(namespace, cronjobName);
+    },
+    onSuccess: (_, variables) => {
+      console.log("Resume cronjob successful, invalidating queries");
+      queryClient.invalidateQueries({
+        queryKey: ["cronjobs", variables.namespace],
+      });
+    },
+    onError: (error) => {
+      console.error("Failed to resume cronjob:", error);
+      alert(`Failed to resume cronjob: ${error instanceof Error ? error.message : String(error)}`);
+    },
+  });
+}
+
+export function useDeleteCronJob() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      namespace,
+      cronjobName,
+    }: {
+      namespace: string;
+      cronjobName: string;
+    }) => {
+      console.log("useDeleteCronJob mutationFn called with:", { namespace, cronjobName });
+      return api.deleteCronJob(namespace, cronjobName);
+    },
+    onSuccess: (_, variables) => {
+      console.log("Delete cronjob successful, invalidating queries");
+      queryClient.invalidateQueries({
+        queryKey: ["cronjobs", variables.namespace],
+      });
+    },
+    onError: (error) => {
+      console.error("Failed to delete cronjob:", error);
+      alert(`Failed to delete cronjob: ${error instanceof Error ? error.message : String(error)}`);
+    },
+  });
+}
+
 export function useNodes() {
   return useQuery({
     queryKey: ["nodes"],

@@ -258,6 +258,36 @@ export const api = {
     return await invoke("get_cronjobs", { namespace });
   },
 
+  async suspendCronJob(
+    namespace: string,
+    cronjobName: string
+  ): Promise<void> {
+    return await invoke("suspend_cronjob", {
+      namespace,
+      cronjobName,
+    });
+  },
+
+  async resumeCronJob(
+    namespace: string,
+    cronjobName: string
+  ): Promise<void> {
+    return await invoke("resume_cronjob", {
+      namespace,
+      cronjobName,
+    });
+  },
+
+  async deleteCronJob(
+    namespace: string,
+    cronjobName: string
+  ): Promise<void> {
+    return await invoke("delete_cronjob", {
+      namespace,
+      cronjobName,
+    });
+  },
+
   // Node operations
   async getNodes(): Promise<NodeInfo[]> {
     return await invoke("get_nodes");
