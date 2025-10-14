@@ -30,6 +30,16 @@ pub fn run() {
             commands::get_istio_virtual_services,
             commands::get_istio_gateways,
             commands::get_resource_yaml,
+            commands::get_configmaps,
+            commands::get_secrets,
+            commands::get_statefulsets,
+            commands::get_daemonsets,
+            commands::get_jobs,
+            commands::get_cronjobs,
+            commands::get_nodes,
+            commands::get_events,
+            commands::get_persistent_volumes,
+            commands::get_persistent_volume_claims,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

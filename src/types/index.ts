@@ -85,7 +85,123 @@ export interface GatewayServer {
   hosts: string[];
 }
 
-export type ResourceType = "pods" | "deployments" | "services" | "namespaces" | "ingresses" | "istio";
+export interface ConfigMapInfo {
+  name: string;
+  namespace: string;
+  data: Record<string, string>;
+  age: string;
+  keys: number;
+}
+
+export interface SecretInfo {
+  name: string;
+  namespace: string;
+  secret_type: string;
+  data: Record<string, string>;
+  age: string;
+  keys: number;
+}
+
+export interface StatefulSetInfo {
+  name: string;
+  namespace: string;
+  ready: string;
+  replicas: number;
+  age: string;
+}
+
+export interface DaemonSetInfo {
+  name: string;
+  namespace: string;
+  desired: number;
+  current: number;
+  ready: number;
+  up_to_date: number;
+  available: number;
+  age: string;
+}
+
+export interface JobInfo {
+  name: string;
+  namespace: string;
+  completions: string;
+  duration: string;
+  age: string;
+  active: number;
+  succeeded: number;
+  failed: number;
+}
+
+export interface CronJobInfo {
+  name: string;
+  namespace: string;
+  schedule: string;
+  suspend: boolean;
+  active: number;
+  last_schedule?: string;
+  age: string;
+}
+
+export interface NodeInfo {
+  name: string;
+  status: string;
+  roles: string[];
+  age: string;
+  version: string;
+  internal_ip: string;
+  os_image: string;
+  kernel_version: string;
+}
+
+export interface EventInfo {
+  event_type: string;
+  reason: string;
+  object: string;
+  message: string;
+  source: string;
+  first_seen: string;
+  last_seen: string;
+  count: number;
+}
+
+export interface PersistentVolumeInfo {
+  name: string;
+  capacity: string;
+  access_modes: string[];
+  reclaim_policy: string;
+  status: string;
+  claim?: string;
+  storage_class?: string;
+  age: string;
+}
+
+export interface PersistentVolumeClaimInfo {
+  name: string;
+  namespace: string;
+  status: string;
+  volume?: string;
+  capacity?: string;
+  access_modes: string[];
+  storage_class?: string;
+  age: string;
+}
+
+export type ResourceType =
+  | "pods"
+  | "deployments"
+  | "services"
+  | "namespaces"
+  | "ingresses"
+  | "istio"
+  | "configmaps"
+  | "secrets"
+  | "statefulsets"
+  | "daemonsets"
+  | "jobs"
+  | "cronjobs"
+  | "nodes"
+  | "events"
+  | "storage";
 
 export interface AppState {
   currentContext?: string;

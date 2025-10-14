@@ -229,3 +229,151 @@ pub async fn get_resource_yaml(
         .await
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn get_configmaps(
+    namespace: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<ConfigMapInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_configmaps(client, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_secrets(
+    namespace: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<SecretInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_secrets(client, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_statefulsets(
+    namespace: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<StatefulSetInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_statefulsets(client, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_daemonsets(
+    namespace: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<DaemonSetInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_daemonsets(client, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_jobs(
+    namespace: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<JobInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_jobs(client, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_cronjobs(
+    namespace: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<CronJobInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_cronjobs(client, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_nodes(
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<NodeInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_nodes(client)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_events(
+    namespace: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<EventInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_events(client, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_persistent_volumes(
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<PersistentVolumeInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_persistent_volumes(client)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_persistent_volume_claims(
+    namespace: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<PersistentVolumeClaimInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_persistent_volume_claims(client, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}

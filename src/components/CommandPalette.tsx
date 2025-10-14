@@ -12,6 +12,12 @@ import {
   Moon,
   Sun,
   Search,
+  Settings,
+  Lock,
+  Database,
+  HardDrive,
+  Activity,
+  Cpu,
 } from "lucide-react";
 import { ResourceType } from "../types";
 
@@ -77,7 +83,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             No results found.
           </Command.Empty>
 
-          <Command.Group heading="Views" className="px-2 py-2">
+          <Command.Group heading="Workloads" className="px-2 py-2">
             <Command.Item
               onSelect={() => navigateTo("pods")}
               className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer hover:bg-accent"
@@ -92,6 +98,16 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
               <Server className="w-4 h-4" />
               <span>Deployments</span>
             </Command.Item>
+            <Command.Item
+              onSelect={() => navigateTo("statefulsets")}
+              className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer hover:bg-accent"
+            >
+              <Database className="w-4 h-4" />
+              <span>Workloads (StatefulSets, DaemonSets, Jobs)</span>
+            </Command.Item>
+          </Command.Group>
+
+          <Command.Group heading="Network" className="px-2 py-2">
             <Command.Item
               onSelect={() => navigateTo("services")}
               className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer hover:bg-accent"
@@ -112,6 +128,47 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             >
               <Layers className="w-4 h-4" />
               <span>Istio</span>
+            </Command.Item>
+          </Command.Group>
+
+          <Command.Group heading="Configuration" className="px-2 py-2">
+            <Command.Item
+              onSelect={() => navigateTo("configmaps")}
+              className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer hover:bg-accent"
+            >
+              <Settings className="w-4 h-4" />
+              <span>ConfigMaps</span>
+            </Command.Item>
+            <Command.Item
+              onSelect={() => navigateTo("secrets")}
+              className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer hover:bg-accent"
+            >
+              <Lock className="w-4 h-4" />
+              <span>Secrets</span>
+            </Command.Item>
+          </Command.Group>
+
+          <Command.Group heading="Storage & Cluster" className="px-2 py-2">
+            <Command.Item
+              onSelect={() => navigateTo("storage")}
+              className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer hover:bg-accent"
+            >
+              <HardDrive className="w-4 h-4" />
+              <span>Storage (PV & PVC)</span>
+            </Command.Item>
+            <Command.Item
+              onSelect={() => navigateTo("nodes")}
+              className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer hover:bg-accent"
+            >
+              <Cpu className="w-4 h-4" />
+              <span>Nodes</span>
+            </Command.Item>
+            <Command.Item
+              onSelect={() => navigateTo("events")}
+              className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer hover:bg-accent"
+            >
+              <Activity className="w-4 h-4" />
+              <span>Events</span>
             </Command.Item>
             <Command.Item
               onSelect={() => navigateTo("namespaces")}

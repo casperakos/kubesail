@@ -131,3 +131,91 @@ export function useIstioGateways(namespace: string) {
     refetchInterval: 10000,
   });
 }
+
+export function useConfigMaps(namespace: string) {
+  return useQuery({
+    queryKey: ["configmaps", namespace],
+    queryFn: () => api.getConfigMaps(namespace),
+    enabled: !!namespace,
+    refetchInterval: 10000,
+  });
+}
+
+export function useSecrets(namespace: string) {
+  return useQuery({
+    queryKey: ["secrets", namespace],
+    queryFn: () => api.getSecrets(namespace),
+    enabled: !!namespace,
+    refetchInterval: 10000,
+  });
+}
+
+export function useStatefulSets(namespace: string) {
+  return useQuery({
+    queryKey: ["statefulsets", namespace],
+    queryFn: () => api.getStatefulSets(namespace),
+    enabled: !!namespace,
+    refetchInterval: 5000,
+  });
+}
+
+export function useDaemonSets(namespace: string) {
+  return useQuery({
+    queryKey: ["daemonsets", namespace],
+    queryFn: () => api.getDaemonSets(namespace),
+    enabled: !!namespace,
+    refetchInterval: 5000,
+  });
+}
+
+export function useJobs(namespace: string) {
+  return useQuery({
+    queryKey: ["jobs", namespace],
+    queryFn: () => api.getJobs(namespace),
+    enabled: !!namespace,
+    refetchInterval: 5000,
+  });
+}
+
+export function useCronJobs(namespace: string) {
+  return useQuery({
+    queryKey: ["cronjobs", namespace],
+    queryFn: () => api.getCronJobs(namespace),
+    enabled: !!namespace,
+    refetchInterval: 10000,
+  });
+}
+
+export function useNodes() {
+  return useQuery({
+    queryKey: ["nodes"],
+    queryFn: () => api.getNodes(),
+    refetchInterval: 10000,
+  });
+}
+
+export function useEvents(namespace: string) {
+  return useQuery({
+    queryKey: ["events", namespace],
+    queryFn: () => api.getEvents(namespace),
+    enabled: !!namespace,
+    refetchInterval: 5000, // Events change frequently
+  });
+}
+
+export function usePersistentVolumes() {
+  return useQuery({
+    queryKey: ["persistent-volumes"],
+    queryFn: () => api.getPersistentVolumes(),
+    refetchInterval: 10000,
+  });
+}
+
+export function usePersistentVolumeClaims(namespace: string) {
+  return useQuery({
+    queryKey: ["persistent-volume-claims", namespace],
+    queryFn: () => api.getPersistentVolumeClaims(namespace),
+    enabled: !!namespace,
+    refetchInterval: 10000,
+  });
+}

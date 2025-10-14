@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import {
+import type {
   ClusterInfo,
   ContextInfo,
   DeploymentInfo,
@@ -7,6 +7,16 @@ import {
   NamespaceInfo,
   PodInfo,
   ServiceInfo,
+  ConfigMapInfo,
+  SecretInfo,
+  StatefulSetInfo,
+  DaemonSetInfo,
+  JobInfo,
+  CronJobInfo,
+  NodeInfo,
+  EventInfo,
+  PersistentVolumeInfo,
+  PersistentVolumeClaimInfo,
 } from "../types";
 
 export const api = {
@@ -98,5 +108,57 @@ export const api = {
       namespace,
       name,
     });
+  },
+
+  // ConfigMap operations
+  async getConfigMaps(namespace: string): Promise<ConfigMapInfo[]> {
+    return await invoke("get_configmaps", { namespace });
+  },
+
+  // Secret operations
+  async getSecrets(namespace: string): Promise<SecretInfo[]> {
+    return await invoke("get_secrets", { namespace });
+  },
+
+  // StatefulSet operations
+  async getStatefulSets(namespace: string): Promise<StatefulSetInfo[]> {
+    return await invoke("get_statefulsets", { namespace });
+  },
+
+  // DaemonSet operations
+  async getDaemonSets(namespace: string): Promise<DaemonSetInfo[]> {
+    return await invoke("get_daemonsets", { namespace });
+  },
+
+  // Job operations
+  async getJobs(namespace: string): Promise<JobInfo[]> {
+    return await invoke("get_jobs", { namespace });
+  },
+
+  // CronJob operations
+  async getCronJobs(namespace: string): Promise<CronJobInfo[]> {
+    return await invoke("get_cronjobs", { namespace });
+  },
+
+  // Node operations
+  async getNodes(): Promise<NodeInfo[]> {
+    return await invoke("get_nodes");
+  },
+
+  // Event operations
+  async getEvents(namespace: string): Promise<EventInfo[]> {
+    return await invoke("get_events", { namespace });
+  },
+
+  // PersistentVolume operations
+  async getPersistentVolumes(): Promise<PersistentVolumeInfo[]> {
+    return await invoke("get_persistent_volumes");
+  },
+
+  // PersistentVolumeClaim operations
+  async getPersistentVolumeClaims(
+    namespace: string
+  ): Promise<PersistentVolumeClaimInfo[]> {
+    return await invoke("get_persistent_volume_claims", { namespace });
   },
 };

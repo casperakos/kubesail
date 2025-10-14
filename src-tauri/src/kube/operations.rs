@@ -1,13 +1,20 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use k8s_openapi::api::apps::v1::Deployment;
-use k8s_openapi::api::core::v1::{Namespace, Pod, Service};
+use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet};
+use k8s_openapi::api::batch::v1::{Job, CronJob};
+use k8s_openapi::api::core::v1::{Namespace, Pod, Service, ConfigMap, Secret, Node, Event, PersistentVolume, PersistentVolumeClaim};
 use k8s_openapi::api::networking::v1::Ingress;
 use kube::api::{Api, ListParams, LogParams};
 use kube::{Client, ResourceExt};
 use std::time::SystemTime;
+use std::collections::HashMap;
 
-use crate::types::{DeploymentInfo, IngressInfo, IstioVirtualServiceInfo, IstioGatewayInfo, GatewayServer, LogEntry, NamespaceInfo, PodInfo, ServiceInfo};
+use crate::types::{
+    DeploymentInfo, IngressInfo, IstioVirtualServiceInfo, IstioGatewayInfo, GatewayServer,
+    LogEntry, NamespaceInfo, PodInfo, ServiceInfo, ConfigMapInfo, SecretInfo,
+    StatefulSetInfo, DaemonSetInfo, JobInfo, CronJobInfo, NodeInfo, EventInfo,
+    PersistentVolumeInfo, PersistentVolumeClaimInfo,
+};
 
 pub async fn list_namespaces(client: Client) -> Result<Vec<NamespaceInfo>> {
     let namespaces: Api<Namespace> = Api::all(client);
@@ -550,4 +557,562 @@ pub async fn get_resource_yaml(
     };
 
     Ok(yaml)
+}
+
+pub async fn list_configmaps(client: Client, namespace: &str) -> Result<Vec<ConfigMapInfo>> {
+    let configmaps: Api<ConfigMap> = Api::namespaced(client, namespace);
+    let lp = ListParams::default();
+    let configmap_list = configmaps.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for cm in configmap_list {
+        let name = cm.metadata.name.unwrap_or_default();
+        let namespace = cm.metadata.namespace.unwrap_or_default();
+
+        let data = cm.data.unwrap_or_default()
+            .into_iter()
+            .collect::<HashMap<String, String>>();
+        let keys = data.len();
+
+        let age = cm
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        result.push(ConfigMapInfo {
+            name,
+            namespace,
+            data,
+            age,
+            keys,
+        });
+    }
+
+    Ok(result)
+}
+
+pub async fn list_secrets(client: Client, namespace: &str) -> Result<Vec<SecretInfo>> {
+    let secrets: Api<Secret> = Api::namespaced(client, namespace);
+    let lp = ListParams::default();
+    let secret_list = secrets.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for secret in secret_list {
+        let name = secret.metadata.name.unwrap_or_default();
+        let namespace = secret.metadata.namespace.unwrap_or_default();
+
+        let secret_type = secret
+            .type_
+            .as_ref()
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| "Opaque".to_string());
+
+        // Decode base64 data
+        let mut decoded_data = HashMap::new();
+        if let Some(data) = secret.data {
+            for (key, value) in data {
+                let decoded = String::from_utf8(value.0.clone())
+                    .unwrap_or_else(|_| format!("<binary data: {} bytes>", value.0.len()));
+                decoded_data.insert(key, decoded);
+            }
+        }
+
+        let keys = decoded_data.len();
+
+        let age = secret
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        result.push(SecretInfo {
+            name,
+            namespace,
+            secret_type,
+            data: decoded_data,
+            age,
+            keys,
+        });
+    }
+
+    Ok(result)
+}
+
+pub async fn list_statefulsets(client: Client, namespace: &str) -> Result<Vec<StatefulSetInfo>> {
+    let statefulsets: Api<StatefulSet> = Api::namespaced(client, namespace);
+    let lp = ListParams::default();
+    let statefulset_list = statefulsets.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for sts in statefulset_list {
+        let name = sts.metadata.name.unwrap_or_default();
+        let namespace = sts.metadata.namespace.unwrap_or_default();
+
+        let status = sts.status.as_ref();
+        let replicas = sts.spec.as_ref().and_then(|s| s.replicas).unwrap_or(0);
+        let ready_replicas = status.and_then(|s| s.ready_replicas).unwrap_or(0);
+
+        let ready = format!("{}/{}", ready_replicas, replicas);
+
+        let age = sts
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        result.push(StatefulSetInfo {
+            name,
+            namespace,
+            ready,
+            replicas,
+            age,
+        });
+    }
+
+    Ok(result)
+}
+
+pub async fn list_daemonsets(client: Client, namespace: &str) -> Result<Vec<DaemonSetInfo>> {
+    let daemonsets: Api<DaemonSet> = Api::namespaced(client, namespace);
+    let lp = ListParams::default();
+    let daemonset_list = daemonsets.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for ds in daemonset_list {
+        let name = ds.metadata.name.unwrap_or_default();
+        let namespace = ds.metadata.namespace.unwrap_or_default();
+
+        let status = ds.status.as_ref();
+
+        let desired = status.map(|s| s.desired_number_scheduled).unwrap_or(0);
+        let current = status.map(|s| s.current_number_scheduled).unwrap_or(0);
+        let ready = status.map(|s| s.number_ready).unwrap_or(0);
+        let up_to_date = status.and_then(|s| s.updated_number_scheduled).unwrap_or(0);
+        let available = status.and_then(|s| s.number_available).unwrap_or(0);
+
+        let age = ds
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        result.push(DaemonSetInfo {
+            name,
+            namespace,
+            desired,
+            current,
+            ready,
+            up_to_date,
+            available,
+            age,
+        });
+    }
+
+    Ok(result)
+}
+
+pub async fn list_jobs(client: Client, namespace: &str) -> Result<Vec<JobInfo>> {
+    let jobs: Api<Job> = Api::namespaced(client, namespace);
+    let lp = ListParams::default();
+    let job_list = jobs.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for job in job_list {
+        let name = job.metadata.name.unwrap_or_default();
+        let namespace = job.metadata.namespace.unwrap_or_default();
+
+        let spec = job.spec.as_ref();
+        let status = job.status.as_ref();
+
+        let completions = spec
+            .and_then(|s| s.completions)
+            .map(|c| c.to_string())
+            .unwrap_or_else(|| "1".to_string());
+
+        let active = status.and_then(|s| s.active).unwrap_or(0);
+        let succeeded = status.and_then(|s| s.succeeded).unwrap_or(0);
+        let failed = status.and_then(|s| s.failed).unwrap_or(0);
+
+        let duration = status
+            .and_then(|s| s.completion_time.as_ref())
+            .zip(status.and_then(|s| s.start_time.as_ref()))
+            .map(|(completion, start)| {
+                let dur = completion.0.signed_duration_since(start.0);
+                format_age(&(start.0 + dur))
+            })
+            .unwrap_or_else(|| "Running".to_string());
+
+        let age = job
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        result.push(JobInfo {
+            name,
+            namespace,
+            completions,
+            duration,
+            age,
+            active,
+            succeeded,
+            failed,
+        });
+    }
+
+    Ok(result)
+}
+
+pub async fn list_cronjobs(client: Client, namespace: &str) -> Result<Vec<CronJobInfo>> {
+    let cronjobs: Api<CronJob> = Api::namespaced(client, namespace);
+    let lp = ListParams::default();
+    let cronjob_list = cronjobs.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for cj in cronjob_list {
+        let name = cj.metadata.name.unwrap_or_default();
+        let namespace = cj.metadata.namespace.unwrap_or_default();
+
+        let spec = cj.spec.as_ref();
+        let status = cj.status.as_ref();
+
+        let schedule = spec
+            .map(|s| s.schedule.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let suspend = spec.and_then(|s| s.suspend).unwrap_or(false);
+
+        let active = status
+            .and_then(|s| s.active.as_ref())
+            .map(|a| a.len() as i32)
+            .unwrap_or(0);
+
+        let last_schedule = status
+            .and_then(|s| s.last_schedule_time.as_ref())
+            .map(|ts| format_age(&ts.0));
+
+        let age = cj
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        result.push(CronJobInfo {
+            name,
+            namespace,
+            schedule,
+            suspend,
+            active,
+            last_schedule,
+            age,
+        });
+    }
+
+    Ok(result)
+}
+
+pub async fn list_nodes(client: Client) -> Result<Vec<NodeInfo>> {
+    let nodes: Api<Node> = Api::all(client);
+    let lp = ListParams::default();
+    let node_list = nodes.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for node in node_list {
+        let name = node.metadata.name.unwrap_or_default();
+
+        let status = node
+            .status
+            .as_ref()
+            .and_then(|s| s.conditions.as_ref())
+            .and_then(|conditions| {
+                conditions
+                    .iter()
+                    .find(|c| c.type_ == "Ready")
+                    .map(|c| if c.status == "True" { "Ready" } else { "NotReady" })
+            })
+            .unwrap_or("Unknown")
+            .to_string();
+
+        let roles = node
+            .metadata
+            .labels
+            .as_ref()
+            .map(|labels| {
+                labels
+                    .iter()
+                    .filter(|(k, _)| k.starts_with("node-role.kubernetes.io/"))
+                    .map(|(k, _)| {
+                        k.strip_prefix("node-role.kubernetes.io/")
+                            .unwrap_or("unknown")
+                            .to_string()
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        let version = node
+            .status
+            .as_ref()
+            .and_then(|s| s.node_info.as_ref())
+            .map(|ni| ni.kubelet_version.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let internal_ip = node
+            .status
+            .as_ref()
+            .and_then(|s| s.addresses.as_ref())
+            .and_then(|addresses| {
+                addresses
+                    .iter()
+                    .find(|a| a.type_ == "InternalIP")
+                    .map(|a| a.address.clone())
+            })
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let os_image = node
+            .status
+            .as_ref()
+            .and_then(|s| s.node_info.as_ref())
+            .map(|ni| ni.os_image.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let kernel_version = node
+            .status
+            .as_ref()
+            .and_then(|s| s.node_info.as_ref())
+            .map(|ni| ni.kernel_version.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let age = node
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        result.push(NodeInfo {
+            name,
+            status,
+            roles,
+            age,
+            version,
+            internal_ip,
+            os_image,
+            kernel_version,
+        });
+    }
+
+    Ok(result)
+}
+
+pub async fn list_events(client: Client, namespace: &str) -> Result<Vec<EventInfo>> {
+    let events: Api<Event> = Api::namespaced(client, namespace);
+    let lp = ListParams::default();
+    let event_list = events.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for event in event_list {
+        let event_type = event.type_.unwrap_or_else(|| "Normal".to_string());
+        let reason = event.reason.unwrap_or_else(|| "Unknown".to_string());
+        let message = event.message.unwrap_or_else(|| "No message".to_string());
+
+        let object = event
+            .involved_object
+            .name
+            .map(|name| {
+                format!(
+                    "{}/{}",
+                    event.involved_object.kind.unwrap_or_else(|| "Unknown".to_string()),
+                    name
+                )
+            })
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let source = event
+            .source
+            .as_ref()
+            .and_then(|s| s.component.as_ref())
+            .map(|c| c.to_string())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let first_seen = event
+            .first_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let last_seen = event
+            .last_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let count = event.count.unwrap_or(1);
+
+        result.push(EventInfo {
+            event_type,
+            reason,
+            object,
+            message,
+            source,
+            first_seen,
+            last_seen,
+            count,
+        });
+    }
+
+    Ok(result)
+}
+
+pub async fn list_persistent_volumes(client: Client) -> Result<Vec<PersistentVolumeInfo>> {
+    let pvs: Api<PersistentVolume> = Api::all(client);
+    let lp = ListParams::default();
+    let pv_list = pvs.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for pv in pv_list {
+        let name = pv.metadata.name.unwrap_or_default();
+
+        let spec = pv.spec.as_ref();
+
+        let capacity = spec
+            .and_then(|s| s.capacity.as_ref())
+            .and_then(|c| c.get("storage"))
+            .map(|q| q.0.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let access_modes = spec
+            .and_then(|s| s.access_modes.as_ref())
+            .map(|modes| modes.clone())
+            .unwrap_or_default();
+
+        let reclaim_policy = spec
+            .and_then(|s| s.persistent_volume_reclaim_policy.as_ref())
+            .map(|p| p.to_string())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let status = pv
+            .status
+            .as_ref()
+            .and_then(|s| s.phase.as_ref())
+            .map(|p| p.to_string())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let claim = pv
+            .spec
+            .as_ref()
+            .and_then(|s| s.claim_ref.as_ref())
+            .map(|c| {
+                format!(
+                    "{}/{}",
+                    c.namespace.as_ref().unwrap_or(&"Unknown".to_string()),
+                    c.name.as_ref().unwrap_or(&"Unknown".to_string())
+                )
+            });
+
+        let storage_class = spec
+            .and_then(|s| s.storage_class_name.as_ref())
+            .map(|sc| sc.to_string());
+
+        let age = pv
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        result.push(PersistentVolumeInfo {
+            name,
+            capacity,
+            access_modes,
+            reclaim_policy,
+            status,
+            claim,
+            storage_class,
+            age,
+        });
+    }
+
+    Ok(result)
+}
+
+pub async fn list_persistent_volume_claims(
+    client: Client,
+    namespace: &str,
+) -> Result<Vec<PersistentVolumeClaimInfo>> {
+    let pvcs: Api<PersistentVolumeClaim> = Api::namespaced(client, namespace);
+    let lp = ListParams::default();
+    let pvc_list = pvcs.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for pvc in pvc_list {
+        let name = pvc.metadata.name.unwrap_or_default();
+        let namespace = pvc.metadata.namespace.unwrap_or_default();
+
+        let status = pvc
+            .status
+            .as_ref()
+            .and_then(|s| s.phase.as_ref())
+            .map(|p| p.to_string())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let volume = pvc.spec.as_ref().and_then(|s| s.volume_name.clone());
+
+        let capacity = pvc
+            .status
+            .as_ref()
+            .and_then(|s| s.capacity.as_ref())
+            .and_then(|c| c.get("storage"))
+            .map(|q| q.0.clone());
+
+        let access_modes = pvc
+            .spec
+            .as_ref()
+            .and_then(|s| s.access_modes.as_ref())
+            .map(|modes| modes.clone())
+            .unwrap_or_default();
+
+        let storage_class = pvc
+            .spec
+            .as_ref()
+            .and_then(|s| s.storage_class_name.as_ref())
+            .map(|sc| sc.to_string());
+
+        let age = pvc
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        result.push(PersistentVolumeClaimInfo {
+            name,
+            namespace,
+            status,
+            volume,
+            capacity,
+            access_modes,
+            storage_class,
+            age,
+        });
+    }
+
+    Ok(result)
 }

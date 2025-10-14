@@ -9,6 +9,12 @@ import { DeploymentsList } from "./features/deployments/DeploymentsList";
 import { ServicesList } from "./features/services/ServicesList";
 import { IngressesList } from "./features/ingresses/IngressesList";
 import { IstioResourcesList } from "./features/ingresses/IstioResourcesList";
+import { ConfigMapsList } from "./features/configmaps/ConfigMapsList";
+import { SecretsList } from "./features/secrets/SecretsList";
+import { WorkloadsList } from "./features/workloads/WorkloadsList";
+import { StorageList } from "./features/storage/StorageList";
+import { NodesList } from "./features/nodes/NodesList";
+import { EventsList } from "./features/events/EventsList";
 import { useAppStore } from "./lib/store";
 
 const queryClient = new QueryClient({
@@ -68,6 +74,15 @@ function MainContent() {
         {currentView === "services" && <ServicesList />}
         {currentView === "ingresses" && <IngressesList />}
         {currentView === "istio" && <IstioResourcesList />}
+        {currentView === "configmaps" && <ConfigMapsList />}
+        {currentView === "secrets" && <SecretsList />}
+        {currentView === "statefulsets" && <WorkloadsList />}
+        {currentView === "daemonsets" && <WorkloadsList />}
+        {currentView === "jobs" && <WorkloadsList />}
+        {currentView === "cronjobs" && <WorkloadsList />}
+        {currentView === "storage" && <StorageList />}
+        {currentView === "nodes" && <NodesList />}
+        {currentView === "events" && <EventsList />}
         {currentView === "namespaces" && (
           <div className="p-8 text-center text-muted-foreground">
             Namespaces view coming soon...
