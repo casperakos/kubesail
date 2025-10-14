@@ -151,14 +151,66 @@ export const api = {
     return await invoke("get_configmaps", { namespace });
   },
 
+  async deleteConfigMap(
+    namespace: string,
+    configmapName: string
+  ): Promise<void> {
+    return await invoke("delete_configmap", {
+      namespace,
+      configmapName,
+    });
+  },
+
   // Secret operations
   async getSecrets(namespace: string): Promise<SecretInfo[]> {
     return await invoke("get_secrets", { namespace });
   },
 
+  async deleteSecret(
+    namespace: string,
+    secretName: string
+  ): Promise<void> {
+    return await invoke("delete_secret", {
+      namespace,
+      secretName,
+    });
+  },
+
   // StatefulSet operations
   async getStatefulSets(namespace: string): Promise<StatefulSetInfo[]> {
     return await invoke("get_statefulsets", { namespace });
+  },
+
+  async scaleStatefulSet(
+    namespace: string,
+    statefulsetName: string,
+    replicas: number
+  ): Promise<void> {
+    return await invoke("scale_statefulset", {
+      namespace,
+      statefulsetName,
+      replicas,
+    });
+  },
+
+  async restartStatefulSet(
+    namespace: string,
+    statefulsetName: string
+  ): Promise<void> {
+    return await invoke("restart_statefulset", {
+      namespace,
+      statefulsetName,
+    });
+  },
+
+  async deleteStatefulSet(
+    namespace: string,
+    statefulsetName: string
+  ): Promise<void> {
+    return await invoke("delete_statefulset", {
+      namespace,
+      statefulsetName,
+    });
   },
 
   // DaemonSet operations

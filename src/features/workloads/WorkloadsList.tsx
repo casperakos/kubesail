@@ -4,6 +4,9 @@ import {
   useDaemonSets,
   useJobs,
   useCronJobs,
+  useScaleStatefulSet,
+  useRestartStatefulSet,
+  useDeleteStatefulSet,
 } from "../../hooks/useKube";
 import { useAppStore } from "../../lib/store";
 import {
@@ -16,8 +19,10 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, FileText } from "lucide-react";
+import { RefreshCw, Search, X, FileText, RotateCw, Trash2 } from "lucide-react";
 import { YamlViewer } from "../../components/YamlViewer";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "../../lib/api";
 
 type WorkloadType = "statefulsets" | "daemonsets" | "jobs" | "cronjobs";
 
@@ -221,6 +226,99 @@ export function WorkloadsList() {
 
 function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const scaleStatefulSet = useScaleStatefulSet();
+  const deleteStatefulSet = useDeleteStatefulSet();
+  const queryClient = useQueryClient();
+  const [scalingStatefulSet, setScalingStatefulSet] = useState<string | null>(null);
+  const [restartingStatefulSet, setRestartingStatefulSet] = useState<string | null>(null);
+  const [statefulsetToDelete, setStatefulsetToDelete] = useState<string | null>(null);
+  const [statefulsetToScale, setStatefulsetToScale] = useState<{
+    name: string;
+    currentReplicas: number;
+  } | null>(null);
+  const [newReplicaCount, setNewReplicaCount] = useState("");
+  const [statefulsetToRestart, setStatefulsetToRestart] = useState<string | null>(null);
+
+  const restartStatefulSetMutation = useMutation({
+    mutationFn: ({ namespace, statefulsetName }: { namespace: string; statefulsetName: string }) =>
+      api.restartStatefulSet(namespace, statefulsetName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["statefulsets", currentNamespace] });
+      queryClient.invalidateQueries({ queryKey: ["pods", currentNamespace] });
+    },
+  });
+
+  const handleScaleStatefulSet = (statefulsetName: string, currentReplicas: number) => {
+    setStatefulsetToScale({ name: statefulsetName, currentReplicas });
+    setNewReplicaCount(currentReplicas.toString());
+  };
+
+  const confirmScaleStatefulSet = () => {
+    if (statefulsetToScale) {
+      const replicas = parseInt(newReplicaCount, 10);
+      if (!isNaN(replicas) && replicas >= 0) {
+        setScalingStatefulSet(statefulsetToScale.name);
+        scaleStatefulSet.mutate(
+          {
+            namespace: currentNamespace,
+            statefulsetName: statefulsetToScale.name,
+            replicas,
+          },
+          {
+            onSettled: () => setScalingStatefulSet(null),
+          }
+        );
+        setStatefulsetToScale(null);
+        setNewReplicaCount("");
+      }
+    }
+  };
+
+  const cancelScaleStatefulSet = () => {
+    setStatefulsetToScale(null);
+    setNewReplicaCount("");
+  };
+
+  const handleRestartStatefulSet = (statefulsetName: string) => {
+    setStatefulsetToRestart(statefulsetName);
+  };
+
+  const confirmRestartStatefulSet = async () => {
+    if (statefulsetToRestart) {
+      setRestartingStatefulSet(statefulsetToRestart);
+      try {
+        await restartStatefulSetMutation.mutateAsync({
+          namespace: currentNamespace,
+          statefulsetName: statefulsetToRestart,
+        });
+      } finally {
+        setRestartingStatefulSet(null);
+      }
+      setStatefulsetToRestart(null);
+    }
+  };
+
+  const cancelRestartStatefulSet = () => {
+    setStatefulsetToRestart(null);
+  };
+
+  const handleDeleteStatefulSet = (statefulsetName: string) => {
+    setStatefulsetToDelete(statefulsetName);
+  };
+
+  const confirmDeleteStatefulSet = () => {
+    if (statefulsetToDelete) {
+      deleteStatefulSet.mutate({
+        namespace: currentNamespace,
+        statefulsetName: statefulsetToDelete,
+      });
+      setStatefulsetToDelete(null);
+    }
+  };
+
+  const cancelDeleteStatefulSet = () => {
+    setStatefulsetToDelete(null);
+  };
 
   if (isLoading) {
     return (
@@ -239,56 +337,171 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Ready</TableHead>
-          <TableHead>Replicas</TableHead>
-          <TableHead>Age</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {!data || data.length === 0 ? (
+    <>
+      <Table>
+        <TableHeader>
           <TableRow>
-            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-              {searchQuery
-                ? `No statefulsets found matching "${searchQuery}"`
-                : `No statefulsets found in namespace "${currentNamespace}"`}
-            </TableCell>
+            <TableHead>Name</TableHead>
+            <TableHead>Ready</TableHead>
+            <TableHead>Replicas</TableHead>
+            <TableHead>Age</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
-        ) : (
-          data.map((sts: any) => (
-          <TableRow key={sts.name}>
-            <TableCell className="font-medium">{sts.name}</TableCell>
-            <TableCell>
-              <Badge
-                variant={
-                  sts.ready === `${sts.replicas}/${sts.replicas}`
-                    ? "success"
-                    : "warning"
-                }
-              >
-                {sts.ready}
-              </Badge>
-            </TableCell>
-            <TableCell>{sts.replicas}</TableCell>
-            <TableCell>{sts.age}</TableCell>
-            <TableCell className="text-right">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onViewYaml(sts.name)}
-              >
-                <FileText className="w-4 h-4" />
+        </TableHeader>
+        <TableBody>
+          {!data || data.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                {searchQuery
+                  ? `No statefulsets found matching "${searchQuery}"`
+                  : `No statefulsets found in namespace "${currentNamespace}"`}
+              </TableCell>
+            </TableRow>
+          ) : (
+            data.map((sts: any) => (
+            <TableRow key={sts.name}>
+              <TableCell className="font-medium">{sts.name}</TableCell>
+              <TableCell>
+                <Badge
+                  variant={
+                    sts.ready === `${sts.replicas}/${sts.replicas}`
+                      ? "success"
+                      : "warning"
+                  }
+                >
+                  {sts.ready}
+                </Badge>
+              </TableCell>
+              <TableCell>{sts.replicas}</TableCell>
+              <TableCell>{sts.age}</TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onViewYaml(sts.name)}
+                    title="View YAML"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleRestartStatefulSet(sts.name)}
+                    disabled={restartingStatefulSet === sts.name}
+                  >
+                    <RotateCw className={`w-4 h-4 mr-2 ${restartingStatefulSet === sts.name ? "animate-spin" : ""}`} />
+                    Restart
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleScaleStatefulSet(sts.name, sts.replicas)}
+                    disabled={scalingStatefulSet === sts.name}
+                  >
+                    Scale
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteStatefulSet(sts.name)}
+                    disabled={deleteStatefulSet.isPending}
+                    title="Delete statefulset"
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+
+      {/* Scale Dialog */}
+      {statefulsetToScale && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Scale StatefulSet</h3>
+            <p className="text-muted-foreground mb-4">
+              StatefulSet: <span className="font-mono text-foreground">"{statefulsetToScale.name}"</span>
+            </p>
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">
+                Replica Count (Current: {statefulsetToScale.currentReplicas})
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={newReplicaCount}
+                onChange={(e) => setNewReplicaCount(e.target.value)}
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50"
+                placeholder="Enter new replica count"
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelScaleStatefulSet}>
+                Cancel
               </Button>
-            </TableCell>
-          </TableRow>
-          ))
-        )}
-      </TableBody>
-    </Table>
+              <Button
+                onClick={confirmScaleStatefulSet}
+                disabled={scaleStatefulSet.isPending || !newReplicaCount || parseInt(newReplicaCount) < 0}
+              >
+                {scaleStatefulSet.isPending ? "Scaling..." : "Scale"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restart Confirmation Dialog */}
+      {statefulsetToRestart && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Restart</h3>
+            <p className="text-muted-foreground mb-6">
+              Are you sure you want to restart statefulset <span className="font-mono text-foreground">"{statefulsetToRestart}"</span>? This will trigger a rolling update and recreate all pods.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelRestartStatefulSet}>
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmRestartStatefulSet}
+                disabled={restartStatefulSetMutation.isPending}
+              >
+                {restartStatefulSetMutation.isPending ? "Restarting..." : "Restart"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {statefulsetToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Deletion</h3>
+            <p className="text-muted-foreground mb-6">
+              Are you sure you want to delete statefulset <span className="font-mono text-foreground">"{statefulsetToDelete}"</span>? This action cannot be undone and will also delete all associated pods.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelDeleteStatefulSet}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDeleteStatefulSet}
+                disabled={deleteStatefulSet.isPending}
+              >
+                {deleteStatefulSet.isPending ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

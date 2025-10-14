@@ -549,6 +549,55 @@ pub async fn apply_resource_yaml(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn scale_statefulset(
+    namespace: String,
+    statefulset_name: String,
+    replicas: i32,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::scale_statefulset(client, &namespace, &statefulset_name, replicas)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn restart_statefulset(
+    namespace: String,
+    statefulset_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::restart_statefulset(client, &namespace, &statefulset_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_statefulset(
+    namespace: String,
+    statefulset_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::delete_statefulset(client, &namespace, &statefulset_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // Port Forward Commands
 #[tauri::command]
 pub async fn start_port_forward(

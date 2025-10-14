@@ -200,6 +200,29 @@ export function useConfigMaps(namespace: string) {
   });
 }
 
+export function useDeleteConfigMap() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      namespace,
+      configmapName,
+    }: {
+      namespace: string;
+      configmapName: string;
+    }) => api.deleteConfigMap(namespace, configmapName),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["configmaps", variables.namespace],
+      });
+    },
+    onError: (error) => {
+      console.error("Failed to delete configmap:", error);
+      alert(`Failed to delete configmap: ${error instanceof Error ? error.message : String(error)}`);
+    },
+  });
+}
+
 export function useSecrets(namespace: string) {
   return useQuery({
     queryKey: ["secrets", namespace],
@@ -209,12 +232,105 @@ export function useSecrets(namespace: string) {
   });
 }
 
+export function useDeleteSecret() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      namespace,
+      secretName,
+    }: {
+      namespace: string;
+      secretName: string;
+    }) => api.deleteSecret(namespace, secretName),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["secrets", variables.namespace],
+      });
+    },
+    onError: (error) => {
+      console.error("Failed to delete secret:", error);
+      alert(`Failed to delete secret: ${error instanceof Error ? error.message : String(error)}`);
+    },
+  });
+}
+
 export function useStatefulSets(namespace: string) {
   return useQuery({
     queryKey: ["statefulsets", namespace],
     queryFn: () => api.getStatefulSets(namespace),
     enabled: !!namespace,
     refetchInterval: 5000,
+  });
+}
+
+export function useScaleStatefulSet() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      namespace,
+      statefulsetName,
+      replicas,
+    }: {
+      namespace: string;
+      statefulsetName: string;
+      replicas: number;
+    }) => api.scaleStatefulSet(namespace, statefulsetName, replicas),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["statefulsets", variables.namespace],
+      });
+      queryClient.invalidateQueries({ queryKey: ["pods", variables.namespace] });
+    },
+  });
+}
+
+export function useRestartStatefulSet() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      namespace,
+      statefulsetName,
+    }: {
+      namespace: string;
+      statefulsetName: string;
+    }) => api.restartStatefulSet(namespace, statefulsetName),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["statefulsets", variables.namespace],
+      });
+      queryClient.invalidateQueries({ queryKey: ["pods", variables.namespace] });
+    },
+  });
+}
+
+export function useDeleteStatefulSet() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      namespace,
+      statefulsetName,
+    }: {
+      namespace: string;
+      statefulsetName: string;
+    }) => {
+      console.log("useDeleteStatefulSet mutationFn called with:", { namespace, statefulsetName });
+      return api.deleteStatefulSet(namespace, statefulsetName);
+    },
+    onSuccess: (_, variables) => {
+      console.log("Delete statefulset successful, invalidating queries");
+      queryClient.invalidateQueries({
+        queryKey: ["statefulsets", variables.namespace],
+      });
+      queryClient.invalidateQueries({ queryKey: ["pods", variables.namespace] });
+    },
+    onError: (error) => {
+      console.error("Failed to delete statefulset:", error);
+      alert(`Failed to delete statefulset: ${error instanceof Error ? error.message : String(error)}`);
+    },
   });
 }
 

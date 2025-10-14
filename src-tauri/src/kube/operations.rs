@@ -380,6 +380,75 @@ pub async fn restart_deployment(
     Ok(())
 }
 
+pub async fn scale_statefulset(
+    client: Client,
+    namespace: &str,
+    statefulset_name: &str,
+    replicas: i32,
+) -> Result<()> {
+    let statefulsets: Api<StatefulSet> = Api::namespaced(client, namespace);
+
+    let patch = serde_json::json!({
+        "spec": {
+            "replicas": replicas
+        }
+    });
+
+    statefulsets
+        .patch(
+            statefulset_name,
+            &kube::api::PatchParams::default(),
+            &kube::api::Patch::Strategic(&patch),
+        )
+        .await?;
+
+    Ok(())
+}
+
+pub async fn restart_statefulset(
+    client: Client,
+    namespace: &str,
+    statefulset_name: &str,
+) -> Result<()> {
+    let statefulsets: Api<StatefulSet> = Api::namespaced(client, namespace);
+
+    // Trigger a rollout restart by adding/updating the restart annotation
+    let now = chrono::Utc::now().to_rfc3339();
+    let patch = serde_json::json!({
+        "spec": {
+            "template": {
+                "metadata": {
+                    "annotations": {
+                        "kubectl.kubernetes.io/restartedAt": now
+                    }
+                }
+            }
+        }
+    });
+
+    statefulsets
+        .patch(
+            statefulset_name,
+            &kube::api::PatchParams::default(),
+            &kube::api::Patch::Strategic(&patch),
+        )
+        .await?;
+
+    Ok(())
+}
+
+pub async fn delete_statefulset(
+    client: Client,
+    namespace: &str,
+    statefulset_name: &str,
+) -> Result<()> {
+    let statefulsets: Api<StatefulSet> = Api::namespaced(client, namespace);
+    statefulsets
+        .delete(statefulset_name, &Default::default())
+        .await?;
+    Ok(())
+}
+
 fn format_age(timestamp: &DateTime<Utc>) -> String {
     let now = SystemTime::now();
     let now: DateTime<Utc> = now.into();

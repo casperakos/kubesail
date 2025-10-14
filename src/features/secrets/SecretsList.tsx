@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useSecrets } from "../../hooks/useKube";
+import { useSecrets, useDeleteSecret } from "../../hooks/useKube";
 import { useAppStore } from "../../lib/store";
 import {
   Table,
@@ -11,16 +11,36 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Eye, EyeOff, Search, X, FileText } from "lucide-react";
+import { RefreshCw, Eye, EyeOff, Search, X, FileText, Trash2 } from "lucide-react";
 import { SecretInfo } from "../../types";
 import { YamlViewer } from "../../components/YamlViewer";
 
 export function SecretsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const { data: secrets, isLoading, error, refetch } = useSecrets(currentNamespace);
+  const deleteSecret = useDeleteSecret();
   const [selectedSecret, setSelectedSecret] = useState<SecretInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedResource, setSelectedResource] = useState<string | null>(null);
+  const [secretToDelete, setSecretToDelete] = useState<string | null>(null);
+
+  const handleDelete = (secretName: string) => {
+    setSecretToDelete(secretName);
+  };
+
+  const confirmDelete = () => {
+    if (secretToDelete) {
+      deleteSecret.mutate({
+        namespace: currentNamespace,
+        secretName: secretToDelete,
+      });
+      setSecretToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setSecretToDelete(null);
+  };
 
   const getTypeVariant = (type: string) => {
     if (type.includes("tls")) return "success";
@@ -140,11 +160,12 @@ export function SecretsList() {
               </TableCell>
               <TableCell>{secret.age}</TableCell>
               <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-2">
+                <div className="flex items-center justify-end gap-1">
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
                     onClick={() => setSelectedResource(secret.name)}
+                    title="View YAML"
                   >
                     <FileText className="w-4 h-4" />
                   </Button>
@@ -155,6 +176,15 @@ export function SecretsList() {
                     title="View secret data"
                   >
                     <Eye className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDelete(secret.name)}
+                    disabled={deleteSecret.isPending}
+                    title="Delete secret"
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
                 </div>
               </TableCell>
@@ -178,6 +208,30 @@ export function SecretsList() {
           secret={selectedSecret}
           onClose={() => setSelectedSecret(null)}
         />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {secretToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Deletion</h3>
+            <p className="text-muted-foreground mb-6">
+              Are you sure you want to delete secret <span className="font-mono text-foreground">"{secretToDelete}"</span>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelDelete}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                disabled={deleteSecret.isPending}
+              >
+                {deleteSecret.isPending ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

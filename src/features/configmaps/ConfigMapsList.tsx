@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useConfigMaps } from "../../hooks/useKube";
+import { useConfigMaps, useDeleteConfigMap } from "../../hooks/useKube";
 import { useAppStore } from "../../lib/store";
 import {
   Table,
@@ -11,16 +11,36 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Eye, Search, X, FileText } from "lucide-react";
+import { RefreshCw, Eye, Search, X, FileText, Trash2 } from "lucide-react";
 import { ConfigMapInfo } from "../../types";
 import { YamlViewer } from "../../components/YamlViewer";
 
 export function ConfigMapsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const { data: configmaps, isLoading, error, refetch } = useConfigMaps(currentNamespace);
+  const deleteConfigMap = useDeleteConfigMap();
   const [selectedConfigMap, setSelectedConfigMap] = useState<ConfigMapInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedResource, setSelectedResource] = useState<string | null>(null);
+  const [configmapToDelete, setConfigmapToDelete] = useState<string | null>(null);
+
+  const handleDelete = (configmapName: string) => {
+    setConfigmapToDelete(configmapName);
+  };
+
+  const confirmDelete = () => {
+    if (configmapToDelete) {
+      deleteConfigMap.mutate({
+        namespace: currentNamespace,
+        configmapName: configmapToDelete,
+      });
+      setConfigmapToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setConfigmapToDelete(null);
+  };
 
   // Filter configmaps based on search query
   const filteredConfigMaps = useMemo(() => {
@@ -127,11 +147,12 @@ export function ConfigMapsList() {
               </TableCell>
               <TableCell>{cm.age}</TableCell>
               <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-2">
+                <div className="flex items-center justify-end gap-1">
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
                     onClick={() => setSelectedResource(cm.name)}
+                    title="View YAML"
                   >
                     <FileText className="w-4 h-4" />
                   </Button>
@@ -142,6 +163,15 @@ export function ConfigMapsList() {
                     title="View data"
                   >
                     <Eye className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDelete(cm.name)}
+                    disabled={deleteConfigMap.isPending}
+                    title="Delete configmap"
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>
                 </div>
               </TableCell>
@@ -165,6 +195,30 @@ export function ConfigMapsList() {
           configmap={selectedConfigMap}
           onClose={() => setSelectedConfigMap(null)}
         />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {configmapToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Deletion</h3>
+            <p className="text-muted-foreground mb-6">
+              Are you sure you want to delete configmap <span className="font-mono text-foreground">"{configmapToDelete}"</span>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelDelete}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                disabled={deleteConfigMap.isPending}
+              >
+                {deleteConfigMap.isPending ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
