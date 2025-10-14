@@ -202,7 +202,51 @@ export type ResourceType =
   | "cronjobs"
   | "nodes"
   | "events"
-  | "storage";
+  | "storage"
+  | "rbac";
+
+// RBAC Types
+export interface SubjectInfo {
+  kind: string;
+  name: string;
+  namespace?: string;
+}
+
+export interface RoleInfo {
+  name: string;
+  namespace: string;
+  age: string;
+  rules_count: number;
+}
+
+export interface RoleBindingInfo {
+  name: string;
+  namespace: string;
+  role: string;
+  role_kind: string;
+  subjects: SubjectInfo[];
+  age: string;
+}
+
+export interface ClusterRoleInfo {
+  name: string;
+  age: string;
+  rules_count: number;
+}
+
+export interface ClusterRoleBindingInfo {
+  name: string;
+  role: string;
+  subjects: SubjectInfo[];
+  age: string;
+}
+
+export interface ServiceAccountInfo {
+  name: string;
+  namespace: string;
+  secrets: number;
+  age: string;
+}
 
 export interface ClusterMetrics {
   total_nodes: number;

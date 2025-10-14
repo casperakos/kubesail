@@ -230,3 +230,52 @@ pub struct PersistentVolumeClaimInfo {
     pub storage_class: Option<String>,
     pub age: String,
 }
+
+// RBAC Types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoleInfo {
+    pub name: String,
+    pub namespace: String,
+    pub age: String,
+    pub rules_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoleBindingInfo {
+    pub name: String,
+    pub namespace: String,
+    pub role: String,
+    pub role_kind: String,
+    pub subjects: Vec<SubjectInfo>,
+    pub age: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClusterRoleInfo {
+    pub name: String,
+    pub age: String,
+    pub rules_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClusterRoleBindingInfo {
+    pub name: String,
+    pub role: String,
+    pub subjects: Vec<SubjectInfo>,
+    pub age: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceAccountInfo {
+    pub name: String,
+    pub namespace: String,
+    pub secrets: usize,
+    pub age: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubjectInfo {
+    pub kind: String,
+    pub name: String,
+    pub namespace: Option<String>,
+}

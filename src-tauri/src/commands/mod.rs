@@ -377,3 +377,77 @@ pub async fn get_persistent_volume_claims(
         .await
         .map_err(|e| e.to_string())
 }
+
+// RBAC Commands
+#[tauri::command]
+pub async fn get_roles(
+    namespace: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<RoleInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_roles(client, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_role_bindings(
+    namespace: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<RoleBindingInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_role_bindings(client, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_cluster_roles(
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<ClusterRoleInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_cluster_roles(client)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_cluster_role_bindings(
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<ClusterRoleBindingInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_cluster_role_bindings(client)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_service_accounts(
+    namespace: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<ServiceAccountInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_service_accounts(client, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}

@@ -2,8 +2,9 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet};
 use k8s_openapi::api::batch::v1::{Job, CronJob};
-use k8s_openapi::api::core::v1::{Namespace, Pod, Service, ConfigMap, Secret, Node, Event, PersistentVolume, PersistentVolumeClaim};
+use k8s_openapi::api::core::v1::{Namespace, Pod, Service, ConfigMap, Secret, Node, Event, PersistentVolume, PersistentVolumeClaim, ServiceAccount};
 use k8s_openapi::api::networking::v1::Ingress;
+use k8s_openapi::api::rbac::v1::{Role, RoleBinding, ClusterRole, ClusterRoleBinding};
 use kube::api::{Api, ListParams, LogParams};
 use kube::{Client, ResourceExt};
 use std::time::SystemTime;
@@ -13,7 +14,8 @@ use crate::types::{
     DeploymentInfo, IngressInfo, IstioVirtualServiceInfo, IstioGatewayInfo, GatewayServer,
     LogEntry, NamespaceInfo, PodInfo, ServiceInfo, ConfigMapInfo, SecretInfo,
     StatefulSetInfo, DaemonSetInfo, JobInfo, CronJobInfo, NodeInfo, EventInfo,
-    PersistentVolumeInfo, PersistentVolumeClaimInfo,
+    PersistentVolumeInfo, PersistentVolumeClaimInfo, RoleInfo, RoleBindingInfo,
+    ClusterRoleInfo, ClusterRoleBindingInfo, ServiceAccountInfo, SubjectInfo,
 };
 
 pub async fn list_namespaces(client: Client) -> Result<Vec<NamespaceInfo>> {
@@ -1110,6 +1112,190 @@ pub async fn list_persistent_volume_claims(
             capacity,
             access_modes,
             storage_class,
+            age,
+        });
+    }
+
+    Ok(result)
+}
+
+// RBAC Operations
+pub async fn list_roles(client: Client, namespace: &str) -> Result<Vec<RoleInfo>> {
+    let roles: Api<Role> = Api::namespaced(client, namespace);
+    let lp = ListParams::default();
+    let role_list = roles.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for role in role_list {
+        let name = role.metadata.name.unwrap_or_default();
+        let namespace = role.metadata.namespace.unwrap_or_default();
+
+        let rules_count = role.rules.as_ref().map(|r| r.len()).unwrap_or(0);
+
+        let age = role
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        result.push(RoleInfo {
+            name,
+            namespace,
+            age,
+            rules_count,
+        });
+    }
+
+    Ok(result)
+}
+
+pub async fn list_role_bindings(client: Client, namespace: &str) -> Result<Vec<RoleBindingInfo>> {
+    let role_bindings: Api<RoleBinding> = Api::namespaced(client, namespace);
+    let lp = ListParams::default();
+    let rb_list = role_bindings.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for rb in rb_list {
+        let name = rb.metadata.name.unwrap_or_default();
+        let namespace = rb.metadata.namespace.unwrap_or_default();
+
+        let role = rb.role_ref.name.clone();
+        let role_kind = rb.role_ref.kind.clone();
+
+        let subjects = rb
+            .subjects
+            .as_ref()
+            .map(|subs| {
+                subs.iter()
+                    .map(|s| SubjectInfo {
+                        kind: s.kind.clone(),
+                        name: s.name.clone(),
+                        namespace: s.namespace.clone(),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let age = rb
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        result.push(RoleBindingInfo {
+            name,
+            namespace,
+            role,
+            role_kind,
+            subjects,
+            age,
+        });
+    }
+
+    Ok(result)
+}
+
+pub async fn list_cluster_roles(client: Client) -> Result<Vec<ClusterRoleInfo>> {
+    let cluster_roles: Api<ClusterRole> = Api::all(client);
+    let lp = ListParams::default();
+    let cr_list = cluster_roles.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for cr in cr_list {
+        let name = cr.metadata.name.unwrap_or_default();
+
+        let rules_count = cr.rules.as_ref().map(|r| r.len()).unwrap_or(0);
+
+        let age = cr
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        result.push(ClusterRoleInfo {
+            name,
+            age,
+            rules_count,
+        });
+    }
+
+    Ok(result)
+}
+
+pub async fn list_cluster_role_bindings(client: Client) -> Result<Vec<ClusterRoleBindingInfo>> {
+    let cluster_role_bindings: Api<ClusterRoleBinding> = Api::all(client);
+    let lp = ListParams::default();
+    let crb_list = cluster_role_bindings.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for crb in crb_list {
+        let name = crb.metadata.name.unwrap_or_default();
+
+        let role = crb.role_ref.name.clone();
+
+        let subjects = crb
+            .subjects
+            .as_ref()
+            .map(|subs| {
+                subs.iter()
+                    .map(|s| SubjectInfo {
+                        kind: s.kind.clone(),
+                        name: s.name.clone(),
+                        namespace: s.namespace.clone(),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        let age = crb
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        result.push(ClusterRoleBindingInfo {
+            name,
+            role,
+            subjects,
+            age,
+        });
+    }
+
+    Ok(result)
+}
+
+pub async fn list_service_accounts(client: Client, namespace: &str) -> Result<Vec<ServiceAccountInfo>> {
+    let service_accounts: Api<ServiceAccount> = Api::namespaced(client, namespace);
+    let lp = ListParams::default();
+    let sa_list = service_accounts.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for sa in sa_list {
+        let name = sa.metadata.name.unwrap_or_default();
+        let namespace = sa.metadata.namespace.unwrap_or_default();
+
+        let secrets = sa.secrets.as_ref().map(|s| s.len()).unwrap_or(0);
+
+        let age = sa
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        result.push(ServiceAccountInfo {
+            name,
+            namespace,
+            secrets,
             age,
         });
     }

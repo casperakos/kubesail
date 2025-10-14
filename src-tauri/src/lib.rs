@@ -40,6 +40,11 @@ pub fn run() {
             commands::get_events,
             commands::get_persistent_volumes,
             commands::get_persistent_volume_claims,
+            commands::get_roles,
+            commands::get_role_bindings,
+            commands::get_cluster_roles,
+            commands::get_cluster_role_bindings,
+            commands::get_service_accounts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
