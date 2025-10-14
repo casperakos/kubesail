@@ -93,6 +93,22 @@ pub async fn list_pods(client: Client, namespace: &str) -> Result<Vec<PodInfo>> 
 
         let ip = pod.status.as_ref().and_then(|s| s.pod_ip.clone());
 
+        // Extract all container ports
+        let ports: Vec<i32> = pod
+            .spec
+            .as_ref()
+            .map(|s| {
+                s.containers
+                    .iter()
+                    .flat_map(|c| {
+                        c.ports.as_ref().map(|ports| {
+                            ports.iter().map(|p| p.container_port).collect::<Vec<_>>()
+                        }).unwrap_or_default()
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
         result.push(PodInfo {
             name,
             namespace,
@@ -102,6 +118,7 @@ pub async fn list_pods(client: Client, namespace: &str) -> Result<Vec<PodInfo>> 
             age,
             node,
             ip,
+            ports,
         });
     }
 

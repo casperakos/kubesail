@@ -199,14 +199,16 @@ export function PodsList() {
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSelectedPodForPortForward(pod.name)}
-                    title="Port Forward"
-                  >
-                    <ArrowRightLeft className="w-4 h-4" />
-                  </Button>
+                  {pod.ports && pod.ports.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setSelectedPodForPortForward(pod.name)}
+                      title={`Port Forward (${pod.ports.join(', ')})`}
+                    >
+                      <ArrowRightLeft className="w-4 h-4" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"

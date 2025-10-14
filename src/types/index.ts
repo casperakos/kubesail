@@ -27,6 +27,7 @@ export interface PodInfo {
   age: string;
   node?: string;
   ip?: string;
+  ports: number[];
 }
 
 export interface DeploymentInfo {
@@ -203,7 +204,8 @@ export type ResourceType =
   | "nodes"
   | "events"
   | "storage"
-  | "rbac";
+  | "rbac"
+  | "portforwards";
 
 // RBAC Types
 export interface SubjectInfo {

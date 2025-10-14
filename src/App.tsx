@@ -17,6 +17,7 @@ import { StorageList } from "./features/storage/StorageList";
 import { RBACList } from "./features/rbac/RBACList";
 import { NodesList } from "./features/nodes/NodesList";
 import { EventsList } from "./features/events/EventsList";
+import { PortForwardsPage } from "./features/portforwards/PortForwardsPage";
 import { useAppStore } from "./lib/store";
 
 const queryClient = new QueryClient({
@@ -90,6 +91,7 @@ function MainContent() {
         {currentView === "rbac" && <RBACList />}
         {currentView === "nodes" && <NodesList />}
         {currentView === "events" && <EventsList />}
+        {currentView === "portforwards" && <PortForwardsPage />}
         {currentView === "namespaces" && (
           <div className="p-8 text-center text-muted-foreground">
             Namespaces view coming soon...

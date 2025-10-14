@@ -33,6 +33,7 @@ pub struct PodInfo {
     pub age: String,
     pub node: Option<String>,
     pub ip: Option<String>,
+    pub ports: Vec<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

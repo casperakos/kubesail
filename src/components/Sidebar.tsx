@@ -15,6 +15,7 @@ import {
   Cpu,
   LayoutDashboard,
   Shield,
+  ArrowRightLeft,
 } from "lucide-react";
 import { ResourceType } from "../types";
 import { Logo } from "./Logo";
@@ -66,6 +67,12 @@ const navSections: {
       { icon: Cpu, label: "Nodes", view: "nodes" },
       { icon: Activity, label: "Events", view: "events" },
       { icon: FileText, label: "Namespaces", view: "namespaces" },
+    ],
+  },
+  {
+    title: "Tools",
+    items: [
+      { icon: ArrowRightLeft, label: "Port Forwards", view: "portforwards" },
     ],
   },
 ];
