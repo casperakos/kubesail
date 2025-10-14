@@ -449,6 +449,62 @@ pub async fn delete_statefulset(
     Ok(())
 }
 
+pub async fn restart_daemonset(
+    client: Client,
+    namespace: &str,
+    daemonset_name: &str,
+) -> Result<()> {
+    let daemonsets: Api<DaemonSet> = Api::namespaced(client, namespace);
+
+    // Trigger a rollout restart by adding/updating the restart annotation
+    let now = chrono::Utc::now().to_rfc3339();
+    let patch = serde_json::json!({
+        "spec": {
+            "template": {
+                "metadata": {
+                    "annotations": {
+                        "kubectl.kubernetes.io/restartedAt": now
+                    }
+                }
+            }
+        }
+    });
+
+    daemonsets
+        .patch(
+            daemonset_name,
+            &kube::api::PatchParams::default(),
+            &kube::api::Patch::Strategic(&patch),
+        )
+        .await?;
+
+    Ok(())
+}
+
+pub async fn delete_daemonset(
+    client: Client,
+    namespace: &str,
+    daemonset_name: &str,
+) -> Result<()> {
+    let daemonsets: Api<DaemonSet> = Api::namespaced(client, namespace);
+    daemonsets
+        .delete(daemonset_name, &Default::default())
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_job(
+    client: Client,
+    namespace: &str,
+    job_name: &str,
+) -> Result<()> {
+    let jobs: Api<Job> = Api::namespaced(client, namespace);
+    jobs
+        .delete(job_name, &Default::default())
+        .await?;
+    Ok(())
+}
+
 fn format_age(timestamp: &DateTime<Utc>) -> String {
     let now = SystemTime::now();
     let now: DateTime<Utc> = now.into();

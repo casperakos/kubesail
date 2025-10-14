@@ -7,6 +7,9 @@ import {
   useScaleStatefulSet,
   useRestartStatefulSet,
   useDeleteStatefulSet,
+  useRestartDaemonSet,
+  useDeleteDaemonSet,
+  useDeleteJob,
 } from "../../hooks/useKube";
 import { useAppStore } from "../../lib/store";
 import {
@@ -507,6 +510,61 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
 
 function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const deleteDaemonSet = useDeleteDaemonSet();
+  const queryClient = useQueryClient();
+  const [restartingDaemonSet, setRestartingDaemonSet] = useState<string | null>(null);
+  const [daemonsetToDelete, setDaemonsetToDelete] = useState<string | null>(null);
+  const [daemonsetToRestart, setDaemonsetToRestart] = useState<string | null>(null);
+
+  const restartDaemonSetMutation = useMutation({
+    mutationFn: ({ namespace, daemonsetName }: { namespace: string; daemonsetName: string }) =>
+      api.restartDaemonSet(namespace, daemonsetName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["daemonsets", currentNamespace] });
+      queryClient.invalidateQueries({ queryKey: ["pods", currentNamespace] });
+    },
+  });
+
+  const handleRestartDaemonSet = (daemonsetName: string) => {
+    setDaemonsetToRestart(daemonsetName);
+  };
+
+  const confirmRestartDaemonSet = async () => {
+    if (daemonsetToRestart) {
+      setRestartingDaemonSet(daemonsetToRestart);
+      try {
+        await restartDaemonSetMutation.mutateAsync({
+          namespace: currentNamespace,
+          daemonsetName: daemonsetToRestart,
+        });
+      } finally {
+        setRestartingDaemonSet(null);
+      }
+      setDaemonsetToRestart(null);
+    }
+  };
+
+  const cancelRestartDaemonSet = () => {
+    setDaemonsetToRestart(null);
+  };
+
+  const handleDeleteDaemonSet = (daemonsetName: string) => {
+    setDaemonsetToDelete(daemonsetName);
+  };
+
+  const confirmDeleteDaemonSet = () => {
+    if (daemonsetToDelete) {
+      deleteDaemonSet.mutate({
+        namespace: currentNamespace,
+        daemonsetName: daemonsetToDelete,
+      });
+      setDaemonsetToDelete(null);
+    }
+  };
+
+  const cancelDeleteDaemonSet = () => {
+    setDaemonsetToDelete(null);
+  };
 
   if (isLoading) {
     return (
@@ -525,61 +583,151 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Desired</TableHead>
-          <TableHead>Current</TableHead>
-          <TableHead>Ready</TableHead>
-          <TableHead>Up-to-date</TableHead>
-          <TableHead>Available</TableHead>
-          <TableHead>Age</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {!data || data.length === 0 ? (
+    <>
+      <Table>
+        <TableHeader>
           <TableRow>
-            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-              {searchQuery
-                ? `No daemonsets found matching "${searchQuery}"`
-                : `No daemonsets found in namespace "${currentNamespace}"`}
-            </TableCell>
+            <TableHead>Name</TableHead>
+            <TableHead>Desired</TableHead>
+            <TableHead>Current</TableHead>
+            <TableHead>Ready</TableHead>
+            <TableHead>Up-to-date</TableHead>
+            <TableHead>Available</TableHead>
+            <TableHead>Age</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
-        ) : (
-          data.map((ds: any) => (
-          <TableRow key={ds.name}>
-            <TableCell className="font-medium">{ds.name}</TableCell>
-            <TableCell>{ds.desired}</TableCell>
-            <TableCell>{ds.current}</TableCell>
-            <TableCell>
-              <Badge variant={ds.ready === ds.desired ? "success" : "warning"}>
-                {ds.ready}
-              </Badge>
-            </TableCell>
-            <TableCell>{ds.up_to_date}</TableCell>
-            <TableCell>{ds.available}</TableCell>
-            <TableCell>{ds.age}</TableCell>
-            <TableCell className="text-right">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onViewYaml(ds.name)}
-              >
-                <FileText className="w-4 h-4" />
+        </TableHeader>
+        <TableBody>
+          {!data || data.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                {searchQuery
+                  ? `No daemonsets found matching "${searchQuery}"`
+                  : `No daemonsets found in namespace "${currentNamespace}"`}
+              </TableCell>
+            </TableRow>
+          ) : (
+            data.map((ds: any) => (
+            <TableRow key={ds.name}>
+              <TableCell className="font-medium">{ds.name}</TableCell>
+              <TableCell>{ds.desired}</TableCell>
+              <TableCell>{ds.current}</TableCell>
+              <TableCell>
+                <Badge variant={ds.ready === ds.desired ? "success" : "warning"}>
+                  {ds.ready}
+                </Badge>
+              </TableCell>
+              <TableCell>{ds.up_to_date}</TableCell>
+              <TableCell>{ds.available}</TableCell>
+              <TableCell>{ds.age}</TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onViewYaml(ds.name)}
+                    title="View YAML"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleRestartDaemonSet(ds.name)}
+                    disabled={restartingDaemonSet === ds.name}
+                  >
+                    <RotateCw className={`w-4 h-4 mr-2 ${restartingDaemonSet === ds.name ? "animate-spin" : ""}`} />
+                    Restart
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteDaemonSet(ds.name)}
+                    disabled={deleteDaemonSet.isPending}
+                    title="Delete daemonset"
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+
+      {/* Restart Confirmation Dialog */}
+      {daemonsetToRestart && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Restart</h3>
+            <p className="text-muted-foreground mb-6">
+              Are you sure you want to restart daemonset <span className="font-mono text-foreground">"{daemonsetToRestart}"</span>? This will trigger a rolling update and recreate all pods.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelRestartDaemonSet}>
+                Cancel
               </Button>
-            </TableCell>
-          </TableRow>
-          ))
-        )}
-      </TableBody>
-    </Table>
+              <Button
+                onClick={confirmRestartDaemonSet}
+                disabled={restartDaemonSetMutation.isPending}
+              >
+                {restartDaemonSetMutation.isPending ? "Restarting..." : "Restart"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {daemonsetToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Deletion</h3>
+            <p className="text-muted-foreground mb-6">
+              Are you sure you want to delete daemonset <span className="font-mono text-foreground">"{daemonsetToDelete}"</span>? This action cannot be undone and will also delete all associated pods.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelDeleteDaemonSet}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDeleteDaemonSet}
+                disabled={deleteDaemonSet.isPending}
+              >
+                {deleteDaemonSet.isPending ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
 function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const deleteJob = useDeleteJob();
+  const [jobToDelete, setJobToDelete] = useState<string | null>(null);
+
+  const handleDeleteJob = (jobName: string) => {
+    setJobToDelete(jobName);
+  };
+
+  const confirmDeleteJob = () => {
+    if (jobToDelete) {
+      deleteJob.mutate({
+        namespace: currentNamespace,
+        jobName: jobToDelete,
+      });
+      setJobToDelete(null);
+    }
+  };
+
+  const cancelDeleteJob = () => {
+    setJobToDelete(null);
+  };
 
   if (isLoading) {
     return (
@@ -596,64 +744,102 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Completions</TableHead>
-          <TableHead>Active</TableHead>
-          <TableHead>Succeeded</TableHead>
-          <TableHead>Failed</TableHead>
-          <TableHead>Duration</TableHead>
-          <TableHead>Age</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {!data || data.length === 0 ? (
+    <>
+      <Table>
+        <TableHeader>
           <TableRow>
-            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-              {searchQuery
-                ? `No jobs found matching "${searchQuery}"`
-                : `No jobs found in namespace "${currentNamespace}"`}
-            </TableCell>
+            <TableHead>Name</TableHead>
+            <TableHead>Completions</TableHead>
+            <TableHead>Active</TableHead>
+            <TableHead>Succeeded</TableHead>
+            <TableHead>Failed</TableHead>
+            <TableHead>Duration</TableHead>
+            <TableHead>Age</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
-        ) : (
-          data.map((job: any) => (
-          <TableRow key={job.name}>
-            <TableCell className="font-medium">{job.name}</TableCell>
-            <TableCell>{job.completions}</TableCell>
-            <TableCell>
-              {job.active > 0 && (
-                <Badge variant="warning">{job.active}</Badge>
-              )}
-            </TableCell>
-            <TableCell>
-              {job.succeeded > 0 && (
-                <Badge variant="success">{job.succeeded}</Badge>
-              )}
-            </TableCell>
-            <TableCell>
-              {job.failed > 0 && (
-                <Badge variant="destructive">{job.failed}</Badge>
-              )}
-            </TableCell>
-            <TableCell>{job.duration}</TableCell>
-            <TableCell>{job.age}</TableCell>
-            <TableCell className="text-right">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onViewYaml(job.name)}
-              >
-                <FileText className="w-4 h-4" />
+        </TableHeader>
+        <TableBody>
+          {!data || data.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                {searchQuery
+                  ? `No jobs found matching "${searchQuery}"`
+                  : `No jobs found in namespace "${currentNamespace}"`}
+              </TableCell>
+            </TableRow>
+          ) : (
+            data.map((job: any) => (
+            <TableRow key={job.name}>
+              <TableCell className="font-medium">{job.name}</TableCell>
+              <TableCell>{job.completions}</TableCell>
+              <TableCell>
+                {job.active > 0 && (
+                  <Badge variant="warning">{job.active}</Badge>
+                )}
+              </TableCell>
+              <TableCell>
+                {job.succeeded > 0 && (
+                  <Badge variant="success">{job.succeeded}</Badge>
+                )}
+              </TableCell>
+              <TableCell>
+                {job.failed > 0 && (
+                  <Badge variant="destructive">{job.failed}</Badge>
+                )}
+              </TableCell>
+              <TableCell>{job.duration}</TableCell>
+              <TableCell>{job.age}</TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onViewYaml(job.name)}
+                    title="View YAML"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteJob(job.name)}
+                    disabled={deleteJob.isPending}
+                    title="Delete job"
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+
+      {/* Delete Confirmation Dialog */}
+      {jobToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Deletion</h3>
+            <p className="text-muted-foreground mb-6">
+              Are you sure you want to delete job <span className="font-mono text-foreground">"{jobToDelete}"</span>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelDeleteJob}>
+                Cancel
               </Button>
-            </TableCell>
-          </TableRow>
-          ))
-        )}
-      </TableBody>
-    </Table>
+              <Button
+                variant="destructive"
+                onClick={confirmDeleteJob}
+                disabled={deleteJob.isPending}
+              >
+                {deleteJob.isPending ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

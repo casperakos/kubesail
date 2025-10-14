@@ -343,12 +343,91 @@ export function useDaemonSets(namespace: string) {
   });
 }
 
+export function useRestartDaemonSet() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      namespace,
+      daemonsetName,
+    }: {
+      namespace: string;
+      daemonsetName: string;
+    }) => api.restartDaemonSet(namespace, daemonsetName),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["daemonsets", variables.namespace],
+      });
+      queryClient.invalidateQueries({ queryKey: ["pods", variables.namespace] });
+    },
+    onError: (error) => {
+      console.error("Failed to restart daemonset:", error);
+      alert(`Failed to restart daemonset: ${error instanceof Error ? error.message : String(error)}`);
+    },
+  });
+}
+
+export function useDeleteDaemonSet() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      namespace,
+      daemonsetName,
+    }: {
+      namespace: string;
+      daemonsetName: string;
+    }) => {
+      console.log("useDeleteDaemonSet mutationFn called with:", { namespace, daemonsetName });
+      return api.deleteDaemonSet(namespace, daemonsetName);
+    },
+    onSuccess: (_, variables) => {
+      console.log("Delete daemonset successful, invalidating queries");
+      queryClient.invalidateQueries({
+        queryKey: ["daemonsets", variables.namespace],
+      });
+      queryClient.invalidateQueries({ queryKey: ["pods", variables.namespace] });
+    },
+    onError: (error) => {
+      console.error("Failed to delete daemonset:", error);
+      alert(`Failed to delete daemonset: ${error instanceof Error ? error.message : String(error)}`);
+    },
+  });
+}
+
 export function useJobs(namespace: string) {
   return useQuery({
     queryKey: ["jobs", namespace],
     queryFn: () => api.getJobs(namespace),
     enabled: !!namespace,
     refetchInterval: 5000,
+  });
+}
+
+export function useDeleteJob() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      namespace,
+      jobName,
+    }: {
+      namespace: string;
+      jobName: string;
+    }) => {
+      console.log("useDeleteJob mutationFn called with:", { namespace, jobName });
+      return api.deleteJob(namespace, jobName);
+    },
+    onSuccess: (_, variables) => {
+      console.log("Delete job successful, invalidating queries");
+      queryClient.invalidateQueries({
+        queryKey: ["jobs", variables.namespace],
+      });
+    },
+    onError: (error) => {
+      console.error("Failed to delete job:", error);
+      alert(`Failed to delete job: ${error instanceof Error ? error.message : String(error)}`);
+    },
   });
 }
 

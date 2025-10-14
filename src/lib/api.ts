@@ -218,9 +218,39 @@ export const api = {
     return await invoke("get_daemonsets", { namespace });
   },
 
+  async restartDaemonSet(
+    namespace: string,
+    daemonsetName: string
+  ): Promise<void> {
+    return await invoke("restart_daemonset", {
+      namespace,
+      daemonsetName,
+    });
+  },
+
+  async deleteDaemonSet(
+    namespace: string,
+    daemonsetName: string
+  ): Promise<void> {
+    return await invoke("delete_daemonset", {
+      namespace,
+      daemonsetName,
+    });
+  },
+
   // Job operations
   async getJobs(namespace: string): Promise<JobInfo[]> {
     return await invoke("get_jobs", { namespace });
+  },
+
+  async deleteJob(
+    namespace: string,
+    jobName: string
+  ): Promise<void> {
+    return await invoke("delete_job", {
+      namespace,
+      jobName,
+    });
   },
 
   // CronJob operations

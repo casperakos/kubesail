@@ -598,6 +598,54 @@ pub async fn delete_statefulset(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn restart_daemonset(
+    namespace: String,
+    daemonset_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::restart_daemonset(client, &namespace, &daemonset_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_daemonset(
+    namespace: String,
+    daemonset_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::delete_daemonset(client, &namespace, &daemonset_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_job(
+    namespace: String,
+    job_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::delete_job(client, &namespace, &job_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // Port Forward Commands
 #[tauri::command]
 pub async fn start_port_forward(
