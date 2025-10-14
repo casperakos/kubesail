@@ -187,4 +187,16 @@ export const api = {
   async getServiceAccounts(namespace: string): Promise<ServiceAccountInfo[]> {
     return await invoke("get_service_accounts", { namespace });
   },
+
+  async applyResourceYaml(
+    resourceType: string,
+    namespace: string,
+    yamlContent: string
+  ): Promise<void> {
+    return await invoke("apply_resource_yaml", {
+      resourceType,
+      namespace,
+      yamlContent,
+    });
+  },
 };

@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import Editor from "@monaco-editor/react";
 import { api } from "../lib/api";
 import { Button } from "./ui/Button";
 import { Badge } from "./ui/Badge";
-import { X, Download, Copy, Check, RefreshCw } from "lucide-react";
+import { X, Download, Copy, Check, RefreshCw, Edit3, Save } from "lucide-react";
+import { useAppStore } from "../lib/store";
 
 interface YamlViewerProps {
   resourceType: string;
@@ -17,14 +19,23 @@ export function YamlViewer({
   namespace,
   onClose,
 }: YamlViewerProps) {
+  const theme = useAppStore((state) => state.theme);
   const [yaml, setYaml] = useState<string>("");
+  const [editedYaml, setEditedYaml] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [applySuccess, setApplySuccess] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const editorRef = useRef<any>(null);
 
   const fetchYaml = async () => {
     setLoading(true);
     setError(null);
+    setApplyError(null);
+    setApplySuccess(false);
     try {
       const yamlContent = await api.getResourceYaml(
         resourceType,
@@ -32,6 +43,7 @@ export function YamlViewer({
         resourceName
       );
       setYaml(yamlContent);
+      setEditedYaml(yamlContent);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch YAML");
     } finally {
@@ -39,21 +51,60 @@ export function YamlViewer({
     }
   };
 
+  const handleApply = async () => {
+    setApplying(true);
+    setApplyError(null);
+    setApplySuccess(false);
+    try {
+      await api.applyResourceYaml(resourceType, namespace, editedYaml);
+      setApplySuccess(true);
+      setYaml(editedYaml);
+      setIsEditMode(false);
+      setTimeout(() => setApplySuccess(false), 3000);
+      // Refresh the YAML to get the latest from server
+      await fetchYaml();
+    } catch (err) {
+      setApplyError(err instanceof Error ? err.message : "Failed to apply changes");
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const toggleEditMode = () => {
+    if (isEditMode) {
+      // Cancel edit - reset to original yaml
+      setEditedYaml(yaml);
+      setApplyError(null);
+    }
+    setIsEditMode(!isEditMode);
+  };
+
   useEffect(() => {
     fetchYaml();
-    // Handle ESC key
-    const handleEscape = (e: KeyboardEvent) => {
+    // Handle keyboard shortcuts
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        if (isEditMode) {
+          toggleEditMode();
+        } else {
+          onClose();
+        }
+      }
+      // Cmd/Ctrl+S to apply changes
+      if ((e.metaKey || e.ctrlKey) && e.key === "s" && isEditMode) {
+        e.preventDefault();
+        if (!applying && editedYaml !== yaml) {
+          handleApply();
+        }
       }
     };
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, [resourceType, resourceName, namespace, onClose]);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [resourceType, resourceName, namespace, onClose, isEditMode, applying, editedYaml, yaml]);
 
   const copyToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(yaml);
+      await navigator.clipboard.writeText(isEditMode ? editedYaml : yaml);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -62,7 +113,8 @@ export function YamlViewer({
   };
 
   const downloadYaml = () => {
-    const blob = new Blob([yaml], { type: "text/yaml" });
+    const content = isEditMode ? editedYaml : yaml;
+    const blob = new Blob([content], { type: "text/yaml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -89,28 +141,67 @@ export function YamlViewer({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={fetchYaml}>
-              <RefreshCw
-                className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-              />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={copyToClipboard}>
-              {copied ? (
-                <>
-                  <Check className="w-4 h-4 mr-2" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="w-4 h-4 mr-2" />
-                  Copy
-                </>
-              )}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={downloadYaml}>
-              <Download className="w-4 h-4 mr-2" />
-              Download
-            </Button>
+            {!isEditMode && (
+              <>
+                <Button variant="ghost" size="sm" onClick={fetchYaml} disabled={loading}>
+                  <RefreshCw
+                    className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
+                  />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={copyToClipboard}>
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={downloadYaml}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Download
+                </Button>
+              </>
+            )}
+            {isEditMode ? (
+              <>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleApply}
+                  disabled={applying || editedYaml === yaml}
+                >
+                  {applying ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Applying...
+                    </>
+                  ) : applySuccess ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Applied!
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Apply
+                    </>
+                  )}
+                </Button>
+                <Button variant="outline" size="sm" onClick={toggleEditMode}>
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" size="sm" onClick={toggleEditMode} disabled={loading || !!error}>
+                <Edit3 className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+            )}
             <Button variant="ghost" size="icon" onClick={onClose}>
               <X className="w-4 h-4" />
             </Button>
@@ -118,7 +209,7 @@ export function YamlViewer({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-4 bg-gradient-to-br from-muted/30 to-muted/20 custom-scrollbar">
+        <div className="flex-1 overflow-hidden bg-gradient-to-br from-muted/30 to-muted/20">
           {loading && (
             <div className="flex items-center justify-center h-full">
               <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -134,17 +225,52 @@ export function YamlViewer({
             </div>
           )}
 
+          {applyError && (
+            <div className="p-4 bg-destructive/10 border-b border-destructive/50">
+              <p className="text-destructive text-sm">
+                <strong>Error applying changes:</strong> {applyError}
+              </p>
+            </div>
+          )}
+
           {!loading && !error && yaml && (
-            <pre className="font-mono text-sm bg-black/90 text-green-400 p-4 rounded-lg overflow-x-auto whitespace-pre">
-              {yaml}
-            </pre>
+            <Editor
+              height="100%"
+              defaultLanguage="yaml"
+              theme={theme === "dark" ? "vs-dark" : "light"}
+              value={isEditMode ? editedYaml : yaml}
+              onChange={(value) => isEditMode && setEditedYaml(value || "")}
+              options={{
+                readOnly: !isEditMode,
+                minimap: { enabled: true },
+                scrollBeyondLastLine: false,
+                fontSize: 13,
+                wordWrap: "on",
+                automaticLayout: true,
+                tabSize: 2,
+                insertSpaces: true,
+              }}
+              onMount={(editor) => {
+                editorRef.current = editor;
+              }}
+            />
           )}
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between p-4 border-t border-border/50 bg-gradient-to-r from-background/50 to-background/30 text-sm text-muted-foreground">
-          <div>{yaml.split("\n").length} lines</div>
-          <div>Press Esc to close</div>
+          <div className="flex items-center gap-4">
+            <span>{(isEditMode ? editedYaml : yaml).split("\n").length} lines</span>
+            {isEditMode && editedYaml !== yaml && (
+              <Badge variant="warning" className="text-xs">Modified</Badge>
+            )}
+            {applySuccess && (
+              <Badge variant="success" className="text-xs">Applied successfully</Badge>
+            )}
+          </div>
+          <div>
+            {isEditMode ? "Cmd/Ctrl+S to apply • Esc to cancel" : "Press Esc to close"}
+          </div>
         </div>
       </div>
     </div>

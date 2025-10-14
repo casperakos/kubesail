@@ -45,6 +45,7 @@ pub fn run() {
             commands::get_cluster_roles,
             commands::get_cluster_role_bindings,
             commands::get_service_accounts,
+            commands::apply_resource_yaml,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

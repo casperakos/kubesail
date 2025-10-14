@@ -1302,3 +1302,114 @@ pub async fn list_service_accounts(client: Client, namespace: &str) -> Result<Ve
 
     Ok(result)
 }
+
+// Apply YAML to update a resource
+pub async fn apply_resource_yaml(
+    client: Client,
+    resource_type: &str,
+    namespace: &str,
+    yaml_content: &str,
+) -> Result<()> {
+    use kube::api::{Patch, PatchParams};
+    use serde_json::Value;
+
+    // Parse the YAML to JSON
+    let value: Value = serde_yaml::from_str(yaml_content)?;
+
+    // Create patch params for server-side apply
+    let patch_params = PatchParams::apply("kubesail");
+
+    // Apply the resource based on type
+    match resource_type.to_lowercase().as_str() {
+        "pod" => {
+            let api: Api<Pod> = Api::namespaced(client, namespace);
+            let pod: Pod = serde_json::from_value(value)?;
+            api.patch(&pod.name_any(), &patch_params, &Patch::Apply(&pod)).await?;
+        }
+        "deployment" => {
+            let api: Api<Deployment> = Api::namespaced(client, namespace);
+            let deployment: Deployment = serde_json::from_value(value)?;
+            api.patch(&deployment.name_any(), &patch_params, &Patch::Apply(&deployment)).await?;
+        }
+        "service" => {
+            let api: Api<Service> = Api::namespaced(client, namespace);
+            let service: Service = serde_json::from_value(value)?;
+            api.patch(&service.name_any(), &patch_params, &Patch::Apply(&service)).await?;
+        }
+        "configmap" => {
+            let api: Api<ConfigMap> = Api::namespaced(client, namespace);
+            let cm: ConfigMap = serde_json::from_value(value)?;
+            api.patch(&cm.name_any(), &patch_params, &Patch::Apply(&cm)).await?;
+        }
+        "secret" => {
+            let api: Api<Secret> = Api::namespaced(client, namespace);
+            let secret: Secret = serde_json::from_value(value)?;
+            api.patch(&secret.name_any(), &patch_params, &Patch::Apply(&secret)).await?;
+        }
+        "statefulset" => {
+            let api: Api<StatefulSet> = Api::namespaced(client, namespace);
+            let sts: StatefulSet = serde_json::from_value(value)?;
+            api.patch(&sts.name_any(), &patch_params, &Patch::Apply(&sts)).await?;
+        }
+        "daemonset" => {
+            let api: Api<DaemonSet> = Api::namespaced(client, namespace);
+            let ds: DaemonSet = serde_json::from_value(value)?;
+            api.patch(&ds.name_any(), &patch_params, &Patch::Apply(&ds)).await?;
+        }
+        "job" => {
+            let api: Api<Job> = Api::namespaced(client, namespace);
+            let job: Job = serde_json::from_value(value)?;
+            api.patch(&job.name_any(), &patch_params, &Patch::Apply(&job)).await?;
+        }
+        "cronjob" => {
+            let api: Api<CronJob> = Api::namespaced(client, namespace);
+            let cj: CronJob = serde_json::from_value(value)?;
+            api.patch(&cj.name_any(), &patch_params, &Patch::Apply(&cj)).await?;
+        }
+        "ingress" => {
+            let api: Api<Ingress> = Api::namespaced(client, namespace);
+            let ingress: Ingress = serde_json::from_value(value)?;
+            api.patch(&ingress.name_any(), &patch_params, &Patch::Apply(&ingress)).await?;
+        }
+        "persistentvolumeclaim" | "pvc" => {
+            let api: Api<PersistentVolumeClaim> = Api::namespaced(client, namespace);
+            let pvc: PersistentVolumeClaim = serde_json::from_value(value)?;
+            api.patch(&pvc.name_any(), &patch_params, &Patch::Apply(&pvc)).await?;
+        }
+        "persistentvolume" | "pv" => {
+            let api: Api<PersistentVolume> = Api::all(client);
+            let pv: PersistentVolume = serde_json::from_value(value)?;
+            api.patch(&pv.name_any(), &patch_params, &Patch::Apply(&pv)).await?;
+        }
+        "role" => {
+            let api: Api<Role> = Api::namespaced(client, namespace);
+            let role: Role = serde_json::from_value(value)?;
+            api.patch(&role.name_any(), &patch_params, &Patch::Apply(&role)).await?;
+        }
+        "rolebinding" => {
+            let api: Api<RoleBinding> = Api::namespaced(client, namespace);
+            let rb: RoleBinding = serde_json::from_value(value)?;
+            api.patch(&rb.name_any(), &patch_params, &Patch::Apply(&rb)).await?;
+        }
+        "clusterrole" => {
+            let api: Api<ClusterRole> = Api::all(client);
+            let cr: ClusterRole = serde_json::from_value(value)?;
+            api.patch(&cr.name_any(), &patch_params, &Patch::Apply(&cr)).await?;
+        }
+        "clusterrolebinding" => {
+            let api: Api<ClusterRoleBinding> = Api::all(client);
+            let crb: ClusterRoleBinding = serde_json::from_value(value)?;
+            api.patch(&crb.name_any(), &patch_params, &Patch::Apply(&crb)).await?;
+        }
+        "serviceaccount" => {
+            let api: Api<ServiceAccount> = Api::namespaced(client, namespace);
+            let sa: ServiceAccount = serde_json::from_value(value)?;
+            api.patch(&sa.name_any(), &patch_params, &Patch::Apply(&sa)).await?;
+        }
+        _ => {
+            return Err(anyhow::anyhow!("Unsupported resource type: {}", resource_type));
+        }
+    }
+
+    Ok(())
+}

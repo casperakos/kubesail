@@ -451,3 +451,20 @@ pub async fn get_service_accounts(
         .await
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub async fn apply_resource_yaml(
+    resource_type: String,
+    namespace: String,
+    yaml_content: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::apply_resource_yaml(client, &resource_type, &namespace, &yaml_content)
+        .await
+        .map_err(|e| e.to_string())
+}
