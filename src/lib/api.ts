@@ -84,6 +84,26 @@ export const api = {
     });
   },
 
+  async restartDeployment(
+    namespace: string,
+    deploymentName: string
+  ): Promise<void> {
+    return await invoke("restart_deployment", {
+      namespace,
+      deploymentName,
+    });
+  },
+
+  async deleteDeployment(
+    namespace: string,
+    deploymentName: string
+  ): Promise<void> {
+    return await invoke("delete_deployment", {
+      namespace,
+      deploymentName,
+    });
+  },
+
   // Service operations
   async getServices(namespace: string): Promise<ServiceInfo[]> {
     return await invoke("get_services", { namespace });

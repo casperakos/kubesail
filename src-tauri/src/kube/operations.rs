@@ -275,6 +275,18 @@ pub async fn delete_pod(client: Client, namespace: &str, pod_name: &str) -> Resu
     Ok(())
 }
 
+pub async fn delete_deployment(
+    client: Client,
+    namespace: &str,
+    deployment_name: &str,
+) -> Result<()> {
+    let deployments: Api<Deployment> = Api::namespaced(client, namespace);
+    deployments
+        .delete(deployment_name, &Default::default())
+        .await?;
+    Ok(())
+}
+
 pub async fn scale_deployment(
     client: Client,
     namespace: &str,
@@ -286,6 +298,38 @@ pub async fn scale_deployment(
     let patch = serde_json::json!({
         "spec": {
             "replicas": replicas
+        }
+    });
+
+    deployments
+        .patch(
+            deployment_name,
+            &kube::api::PatchParams::default(),
+            &kube::api::Patch::Strategic(&patch),
+        )
+        .await?;
+
+    Ok(())
+}
+
+pub async fn restart_deployment(
+    client: Client,
+    namespace: &str,
+    deployment_name: &str,
+) -> Result<()> {
+    let deployments: Api<Deployment> = Api::namespaced(client, namespace);
+
+    // Trigger a rollout restart by adding/updating the restart annotation
+    let now = chrono::Utc::now().to_rfc3339();
+    let patch = serde_json::json!({
+        "spec": {
+            "template": {
+                "metadata": {
+                    "annotations": {
+                        "kubectl.kubernetes.io/restartedAt": now
+                    }
+                }
+            }
         }
     });
 

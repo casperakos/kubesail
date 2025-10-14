@@ -76,9 +76,17 @@ export function useDeletePod() {
     }: {
       namespace: string;
       podName: string;
-    }) => api.deletePod(namespace, podName),
+    }) => {
+      console.log("useDeletePod mutationFn called with:", { namespace, podName });
+      return api.deletePod(namespace, podName);
+    },
     onSuccess: (_, variables) => {
+      console.log("Delete pod successful, invalidating queries");
       queryClient.invalidateQueries({ queryKey: ["pods", variables.namespace] });
+    },
+    onError: (error) => {
+      console.error("Failed to delete pod:", error);
+      alert(`Failed to delete pod: ${error instanceof Error ? error.message : String(error)}`);
     },
   });
 }
@@ -101,6 +109,34 @@ export function useScaleDeployment() {
         queryKey: ["deployments", variables.namespace],
       });
       queryClient.invalidateQueries({ queryKey: ["pods", variables.namespace] });
+    },
+  });
+}
+
+export function useDeleteDeployment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      namespace,
+      deploymentName,
+    }: {
+      namespace: string;
+      deploymentName: string;
+    }) => {
+      console.log("useDeleteDeployment mutationFn called with:", { namespace, deploymentName });
+      return api.deleteDeployment(namespace, deploymentName);
+    },
+    onSuccess: (_, variables) => {
+      console.log("Delete deployment successful, invalidating queries");
+      queryClient.invalidateQueries({
+        queryKey: ["deployments", variables.namespace],
+      });
+      queryClient.invalidateQueries({ queryKey: ["pods", variables.namespace] });
+    },
+    onError: (error) => {
+      console.error("Failed to delete deployment:", error);
+      alert(`Failed to delete deployment: ${error instanceof Error ? error.message : String(error)}`);
     },
   });
 }

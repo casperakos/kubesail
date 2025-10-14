@@ -159,6 +159,38 @@ pub async fn scale_deployment(
 }
 
 #[tauri::command]
+pub async fn restart_deployment(
+    namespace: String,
+    deployment_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::restart_deployment(client, &namespace, &deployment_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_deployment(
+    namespace: String,
+    deployment_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::delete_deployment(client, &namespace, &deployment_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn reinit_kube_client(
     client_manager: State<'_, KubeClientManager>,
 ) -> Result<(), String> {

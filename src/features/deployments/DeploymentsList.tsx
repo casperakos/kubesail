@@ -1,4 +1,4 @@
-import { useDeployments, useScaleDeployment } from "../../hooks/useKube";
+import { useDeployments, useScaleDeployment, useDeleteDeployment } from "../../hooks/useKube";
 import { useAppStore } from "../../lib/store";
 import {
   Table,
@@ -10,40 +10,108 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, FileText } from "lucide-react";
+import { RefreshCw, Search, X, FileText, RotateCw, Trash2 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { YamlViewer } from "../../components/YamlViewer";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "../../lib/api";
 
 export function DeploymentsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const { data: deployments, isLoading, error, refetch } = useDeployments(currentNamespace);
   const scaleDeployment = useScaleDeployment();
+  const deleteDeployment = useDeleteDeployment();
+  const queryClient = useQueryClient();
   const [scalingDeployment, setScalingDeployment] = useState<string | null>(null);
+  const [restartingDeployment, setRestartingDeployment] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDeployment, setSelectedDeployment] = useState<string | null>(null);
+  const [deploymentToDelete, setDeploymentToDelete] = useState<string | null>(null);
+  const [deploymentToScale, setDeploymentToScale] = useState<{
+    name: string;
+    currentReplicas: number;
+  } | null>(null);
+  const [newReplicaCount, setNewReplicaCount] = useState("");
+  const [deploymentToRestart, setDeploymentToRestart] = useState<string | null>(null);
+
+  const restartDeploymentMutation = useMutation({
+    mutationFn: ({ namespace, deploymentName }: { namespace: string; deploymentName: string }) =>
+      api.restartDeployment(namespace, deploymentName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["deployments", currentNamespace] });
+    },
+  });
 
   const handleScale = (deploymentName: string, currentReplicas: number) => {
-    const newReplicas = window.prompt(
-      `Current replicas: ${currentReplicas}\nEnter new replica count:`,
-      currentReplicas.toString()
-    );
+    setDeploymentToScale({ name: deploymentName, currentReplicas });
+    setNewReplicaCount(currentReplicas.toString());
+  };
 
-    if (newReplicas !== null) {
-      const replicas = parseInt(newReplicas, 10);
+  const confirmScale = () => {
+    if (deploymentToScale) {
+      const replicas = parseInt(newReplicaCount, 10);
       if (!isNaN(replicas) && replicas >= 0) {
-        setScalingDeployment(deploymentName);
+        setScalingDeployment(deploymentToScale.name);
         scaleDeployment.mutate(
           {
             namespace: currentNamespace,
-            deploymentName,
+            deploymentName: deploymentToScale.name,
             replicas,
           },
           {
             onSettled: () => setScalingDeployment(null),
           }
         );
+        setDeploymentToScale(null);
+        setNewReplicaCount("");
       }
     }
+  };
+
+  const cancelScale = () => {
+    setDeploymentToScale(null);
+    setNewReplicaCount("");
+  };
+
+  const handleRestart = (deploymentName: string) => {
+    setDeploymentToRestart(deploymentName);
+  };
+
+  const confirmRestart = async () => {
+    if (deploymentToRestart) {
+      setRestartingDeployment(deploymentToRestart);
+      try {
+        await restartDeploymentMutation.mutateAsync({
+          namespace: currentNamespace,
+          deploymentName: deploymentToRestart,
+        });
+      } finally {
+        setRestartingDeployment(null);
+      }
+      setDeploymentToRestart(null);
+    }
+  };
+
+  const cancelRestart = () => {
+    setDeploymentToRestart(null);
+  };
+
+  const handleDelete = (deploymentName: string) => {
+    setDeploymentToDelete(deploymentName);
+  };
+
+  const confirmDelete = () => {
+    if (deploymentToDelete) {
+      deleteDeployment.mutate({
+        namespace: currentNamespace,
+        deploymentName: deploymentToDelete,
+      });
+      setDeploymentToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeploymentToDelete(null);
   };
 
   // Filter deployments based on search query
@@ -190,8 +258,18 @@ export function DeploymentsList() {
                       variant="ghost"
                       size="sm"
                       onClick={() => setSelectedDeployment(deployment.name)}
+                      title="View YAML"
                     >
                       <FileText className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRestart(deployment.name)}
+                      disabled={restartingDeployment === deployment.name}
+                    >
+                      <RotateCw className={`w-4 h-4 mr-2 ${restartingDeployment === deployment.name ? "animate-spin" : ""}`} />
+                      Restart
                     </Button>
                     <Button
                       variant="outline"
@@ -200,6 +278,15 @@ export function DeploymentsList() {
                       disabled={scalingDeployment === deployment.name}
                     >
                       Scale
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(deployment.name)}
+                      disabled={deleteDeployment.isPending}
+                      title="Delete deployment"
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
                   </div>
                 </TableCell>
@@ -217,6 +304,90 @@ export function DeploymentsList() {
           namespace={currentNamespace}
           onClose={() => setSelectedDeployment(null)}
         />
+      )}
+
+      {/* Scale Dialog */}
+      {deploymentToScale && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Scale Deployment</h3>
+            <p className="text-muted-foreground mb-4">
+              Deployment: <span className="font-mono text-foreground">"{deploymentToScale.name}"</span>
+            </p>
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">
+                Replica Count (Current: {deploymentToScale.currentReplicas})
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={newReplicaCount}
+                onChange={(e) => setNewReplicaCount(e.target.value)}
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50"
+                placeholder="Enter new replica count"
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelScale}>
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmScale}
+                disabled={scaleDeployment.isPending || !newReplicaCount || parseInt(newReplicaCount) < 0}
+              >
+                {scaleDeployment.isPending ? "Scaling..." : "Scale"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restart Confirmation Dialog */}
+      {deploymentToRestart && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Restart</h3>
+            <p className="text-muted-foreground mb-6">
+              Are you sure you want to restart deployment <span className="font-mono text-foreground">"{deploymentToRestart}"</span>? This will trigger a rolling update and recreate all pods.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelRestart}>
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmRestart}
+                disabled={restartDeploymentMutation.isPending}
+              >
+                {restartDeploymentMutation.isPending ? "Restarting..." : "Restart"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deploymentToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Deletion</h3>
+            <p className="text-muted-foreground mb-6">
+              Are you sure you want to delete deployment <span className="font-mono text-foreground">"{deploymentToDelete}"</span>? This action cannot be undone and will also delete all associated pods.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelDelete}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                disabled={deleteDeployment.isPending}
+              >
+                {deleteDeployment.isPending ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

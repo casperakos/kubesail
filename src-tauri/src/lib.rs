@@ -29,6 +29,8 @@ pub fn run() {
             commands::get_pod_logs,
             commands::delete_pod,
             commands::scale_deployment,
+            commands::restart_deployment,
+            commands::delete_deployment,
             commands::reinit_kube_client,
             commands::get_ingresses,
             commands::get_istio_virtual_services,

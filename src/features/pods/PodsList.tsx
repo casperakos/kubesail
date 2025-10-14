@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { usePods, useDeletePod } from "../../hooks/useKube";
 import { useAppStore } from "../../lib/store";
 import {
@@ -31,6 +31,9 @@ export function PodsList() {
     ports: number[];
   } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [podToDelete, setPodToDelete] = useState<string | null>(null);
+  const [selectedPods, setSelectedPods] = useState<Set<string>>(new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
   const getStatusVariant = (status: string) => {
     switch (status.toLowerCase()) {
@@ -47,9 +50,60 @@ export function PodsList() {
   };
 
   const handleDelete = (podName: string) => {
-    if (window.confirm(`Are you sure you want to delete pod "${podName}"?`)) {
+    console.log("Delete button clicked for pod:", podName);
+    setPodToDelete(podName);
+  };
+
+  const confirmDelete = () => {
+    if (podToDelete) {
+      console.log("Confirmed deletion, calling mutate");
+      deletePod.mutate({ namespace: currentNamespace, podName: podToDelete });
+      setPodToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    console.log("Deletion cancelled");
+    setPodToDelete(null);
+  };
+
+  const togglePodSelection = (podName: string) => {
+    setSelectedPods(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(podName)) {
+        newSet.delete(podName);
+      } else {
+        newSet.add(podName);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedPods.size === filteredPods.length && filteredPods.length > 0) {
+      setSelectedPods(new Set());
+    } else {
+      setSelectedPods(new Set(filteredPods.map(pod => pod.name)));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedPods.size > 0) {
+      setShowBulkDeleteConfirm(true);
+    }
+  };
+
+  const confirmBulkDelete = async () => {
+    console.log("Confirmed bulk deletion for:", Array.from(selectedPods));
+    for (const podName of selectedPods) {
       deletePod.mutate({ namespace: currentNamespace, podName });
     }
+    setSelectedPods(new Set());
+    setShowBulkDeleteConfirm(false);
+  };
+
+  const cancelBulkDelete = () => {
+    setShowBulkDeleteConfirm(false);
   };
 
   // Filter pods based on search query
@@ -65,6 +119,11 @@ export function PodsList() {
       pod.ip?.toLowerCase().includes(query)
     );
   }, [pods, searchQuery]);
+
+  // Clear selections when namespace changes
+  useEffect(() => {
+    setSelectedPods(new Set());
+  }, [currentNamespace]);
 
   if (isLoading) {
     return (
@@ -127,16 +186,34 @@ export function PodsList() {
             <Badge variant="secondary" className="ml-2">
               {filteredPods?.length || 0} {searchQuery && `of ${pods?.length || 0}`}
             </Badge>
+            {selectedPods.size > 0 && (
+              <Badge variant="destructive" className="ml-2">
+                {selectedPods.size} selected
+              </Badge>
+            )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            disabled={isLoading}
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            {selectedPods.size > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBulkDelete}
+                disabled={deletePod.isPending}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Selected ({selectedPods.size})
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         {/* Search Bar */}
@@ -163,6 +240,14 @@ export function PodsList() {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-12">
+              <input
+                type="checkbox"
+                checked={selectedPods.size === filteredPods.length && filteredPods.length > 0}
+                onChange={toggleSelectAll}
+                className="w-4 h-4 cursor-pointer"
+              />
+            </TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Ready</TableHead>
@@ -176,13 +261,21 @@ export function PodsList() {
         <TableBody>
           {filteredPods.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                 {searchQuery ? `No pods found matching "${searchQuery}"` : "No pods found"}
               </TableCell>
             </TableRow>
           ) : (
             filteredPods.map((pod) => (
             <TableRow key={pod.name}>
+              <TableCell>
+                <input
+                  type="checkbox"
+                  checked={selectedPods.has(pod.name)}
+                  onChange={() => togglePodSelection(pod.name)}
+                  className="w-4 h-4 cursor-pointer"
+                />
+              </TableCell>
               <TableCell className="font-medium">{pod.name}</TableCell>
               <TableCell>
                 <Badge variant={getStatusVariant(pod.status)}>
@@ -268,6 +361,61 @@ export function PodsList() {
           availablePorts={selectedPodForPortForward.ports}
           onClose={() => setSelectedPodForPortForward(null)}
         />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {podToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Deletion</h3>
+            <p className="text-muted-foreground mb-6">
+              Are you sure you want to delete pod <span className="font-mono text-foreground">"{podToDelete}"</span>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelDelete}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                disabled={deletePod.isPending}
+              >
+                {deletePod.isPending ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Confirmation Dialog */}
+      {showBulkDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Bulk Deletion</h3>
+            <p className="text-muted-foreground mb-4">
+              Are you sure you want to delete <span className="font-bold text-foreground">{selectedPods.size}</span> pod{selectedPods.size > 1 ? 's' : ''}? This action cannot be undone.
+            </p>
+            <div className="max-h-40 overflow-y-auto mb-6 p-3 bg-muted/30 rounded border border-border/50">
+              <ul className="text-sm space-y-1">
+                {Array.from(selectedPods).map(podName => (
+                  <li key={podName} className="font-mono text-foreground">• {podName}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelBulkDelete}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmBulkDelete}
+                disabled={deletePod.isPending}
+              >
+                {deletePod.isPending ? "Deleting..." : `Delete ${selectedPods.size} Pod${selectedPods.size > 1 ? 's' : ''}`}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
