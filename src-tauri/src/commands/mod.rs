@@ -191,6 +191,54 @@ pub async fn delete_deployment(
 }
 
 #[tauri::command]
+pub async fn delete_service(
+    namespace: String,
+    service_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::delete_service(client, &namespace, &service_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_configmap(
+    namespace: String,
+    configmap_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::delete_configmap(client, &namespace, &configmap_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_secret(
+    namespace: String,
+    secret_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::delete_secret(client, &namespace, &secret_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn reinit_kube_client(
     client_manager: State<'_, KubeClientManager>,
 ) -> Result<(), String> {

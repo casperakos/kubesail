@@ -52,6 +52,29 @@ export function useServices(namespace: string) {
   });
 }
 
+export function useDeleteService() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      namespace,
+      serviceName,
+    }: {
+      namespace: string;
+      serviceName: string;
+    }) => api.deleteService(namespace, serviceName),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["services", variables.namespace],
+      });
+    },
+    onError: (error) => {
+      console.error("Failed to delete service:", error);
+      alert(`Failed to delete service: ${error instanceof Error ? error.message : String(error)}`);
+    },
+  });
+}
+
 export function usePodLogs(
   namespace: string,
   podName: string,

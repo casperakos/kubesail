@@ -287,6 +287,42 @@ pub async fn delete_deployment(
     Ok(())
 }
 
+pub async fn delete_service(
+    client: Client,
+    namespace: &str,
+    service_name: &str,
+) -> Result<()> {
+    let services: Api<k8s_openapi::api::core::v1::Service> = Api::namespaced(client, namespace);
+    services
+        .delete(service_name, &Default::default())
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_configmap(
+    client: Client,
+    namespace: &str,
+    configmap_name: &str,
+) -> Result<()> {
+    let configmaps: Api<k8s_openapi::api::core::v1::ConfigMap> = Api::namespaced(client, namespace);
+    configmaps
+        .delete(configmap_name, &Default::default())
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_secret(
+    client: Client,
+    namespace: &str,
+    secret_name: &str,
+) -> Result<()> {
+    let secrets: Api<k8s_openapi::api::core::v1::Secret> = Api::namespaced(client, namespace);
+    secrets
+        .delete(secret_name, &Default::default())
+        .await?;
+    Ok(())
+}
+
 pub async fn scale_deployment(
     client: Client,
     namespace: &str,

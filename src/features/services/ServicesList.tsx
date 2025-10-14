@@ -1,4 +1,4 @@
-import { useServices } from "../../hooks/useKube";
+import { useServices, useDeleteService } from "../../hooks/useKube";
 import { useAppStore } from "../../lib/store";
 import {
   Table,
@@ -10,7 +10,7 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, FileText, ArrowRightLeft } from "lucide-react";
+import { RefreshCw, Search, X, FileText, ArrowRightLeft, Trash2 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { YamlViewer } from "../../components/YamlViewer";
 import { PortForwardModal } from "../../components/PortForwardModal";
@@ -18,9 +18,29 @@ import { PortForwardModal } from "../../components/PortForwardModal";
 export function ServicesList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const { data: services, isLoading, error, refetch } = useServices(currentNamespace);
+  const deleteService = useDeleteService();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedResource, setSelectedResource] = useState<string | null>(null);
   const [selectedServiceForPortForward, setSelectedServiceForPortForward] = useState<string | null>(null);
+  const [serviceToDelete, setServiceToDelete] = useState<string | null>(null);
+
+  const handleDelete = (serviceName: string) => {
+    setServiceToDelete(serviceName);
+  };
+
+  const confirmDelete = () => {
+    if (serviceToDelete) {
+      deleteService.mutate({
+        namespace: currentNamespace,
+        serviceName: serviceToDelete,
+      });
+      setServiceToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setServiceToDelete(null);
+  };
 
   const getTypeVariant = (type: string) => {
     switch (type) {
@@ -202,6 +222,15 @@ export function ServicesList() {
                   >
                     <FileText className="w-4 h-4" />
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDelete(service.name)}
+                    disabled={deleteService.isPending}
+                    title="Delete service"
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
                 </div>
               </TableCell>
             </TableRow>
@@ -226,6 +255,30 @@ export function ServicesList() {
           namespace={currentNamespace}
           onClose={() => setSelectedServiceForPortForward(null)}
         />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {serviceToDelete && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Deletion</h3>
+            <p className="text-muted-foreground mb-6">
+              Are you sure you want to delete service <span className="font-mono text-foreground">"{serviceToDelete}"</span>? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={cancelDelete}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDelete}
+                disabled={deleteService.isPending}
+              >
+                {deleteService.isPending ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

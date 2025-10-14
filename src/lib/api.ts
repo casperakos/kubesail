@@ -109,6 +109,16 @@ export const api = {
     return await invoke("get_services", { namespace });
   },
 
+  async deleteService(
+    namespace: string,
+    serviceName: string
+  ): Promise<void> {
+    return await invoke("delete_service", {
+      namespace,
+      serviceName,
+    });
+  },
+
   // Ingress operations
   async getIngresses(namespace: string): Promise<any[]> {
     return await invoke("get_ingresses", { namespace });
