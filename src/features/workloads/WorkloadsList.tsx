@@ -27,6 +27,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { RefreshCw, Search, X, FileText, RotateCw, Trash2, Pause, Play, Code, ScrollText } from "lucide-react";
 import { YamlViewer } from "../../components/YamlViewer";
+import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { PodSelectorModal } from "../../components/PodSelectorModal";
@@ -253,6 +254,7 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
   const [selectedPodsForLogs, setSelectedPodsForLogs] = useState<Array<{name: string; namespace: string}> | null>(null);
   const [selectedPodForLogs, setSelectedPodForLogs] = useState<{name: string; namespace: string} | null>(null);
   const [podsForSelection, setPodsForSelection] = useState<PodInfo[] | null>(null);
+  const [selectedStatefulSetForDescribe, setSelectedStatefulSetForDescribe] = useState<{name: string; namespace: string} | null>(null);
 
   const restartStatefulSetMutation = useMutation({
     mutationFn: ({ namespace, statefulsetName }: { namespace: string; statefulsetName: string }) =>
@@ -439,6 +441,14 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => setSelectedStatefulSetForDescribe({name: sts.name, namespace: sts.namespace})}
+                    title="Describe"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => handleViewLogs(sts.name, sts.namespace)}
                     disabled={loadingPodsFor === sts.name}
                     title="View logs"
@@ -599,6 +609,15 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
           onClose={() => setSelectedPodsForLogs(null)}
         />
       )}
+
+      {selectedStatefulSetForDescribe && (
+        <ResourceDescribeViewer
+          resourceType="statefulset"
+          name={selectedStatefulSetForDescribe.name}
+          namespace={selectedStatefulSetForDescribe.namespace}
+          onClose={() => setSelectedStatefulSetForDescribe(null)}
+        />
+      )}
     </>
   );
 }
@@ -616,6 +635,7 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
   const [selectedPodsForLogsDS, setSelectedPodsForLogsDS] = useState<Array<{name: string; namespace: string}> | null>(null);
   const [selectedPodForLogsDS, setSelectedPodForLogsDS] = useState<{name: string; namespace: string} | null>(null);
   const [podsForSelectionDS, setPodsForSelectionDS] = useState<PodInfo[] | null>(null);
+  const [selectedDaemonSetForDescribe, setSelectedDaemonSetForDescribe] = useState<{name: string; namespace: string} | null>(null);
 
   const restartDaemonSetMutation = useMutation({
     mutationFn: ({ namespace, daemonsetName }: { namespace: string; daemonsetName: string }) =>
@@ -768,6 +788,14 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => setSelectedDaemonSetForDescribe({name: ds.name, namespace: ds.namespace})}
+                    title="Describe"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => handleViewLogsDaemonSet(ds.name, ds.namespace)}
                     disabled={loadingPodsForDS === ds.name}
                     title="View logs"
@@ -883,6 +911,15 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
           onClose={() => setSelectedPodsForLogsDS(null)}
         />
       )}
+
+      {selectedDaemonSetForDescribe && (
+        <ResourceDescribeViewer
+          resourceType="daemonset"
+          name={selectedDaemonSetForDescribe.name}
+          namespace={selectedDaemonSetForDescribe.namespace}
+          onClose={() => setSelectedDaemonSetForDescribe(null)}
+        />
+      )}
     </>
   );
 }
@@ -897,6 +934,7 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const [selectedPodsForLogsJob, setSelectedPodsForLogsJob] = useState<Array<{name: string; namespace: string}> | null>(null);
   const [selectedPodForLogsJob, setSelectedPodForLogsJob] = useState<{name: string; namespace: string} | null>(null);
   const [podsForSelectionJob, setPodsForSelectionJob] = useState<PodInfo[] | null>(null);
+  const [selectedJobForDescribe, setSelectedJobForDescribe] = useState<{name: string; namespace: string} | null>(null);
 
   const handleDeleteJob = (jobName: string) => {
     setJobToDelete(jobName);
@@ -1020,6 +1058,14 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => setSelectedJobForDescribe({name: job.name, namespace: job.namespace})}
+                    title="Describe"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => handleViewLogsJob(job.name, job.namespace)}
                     disabled={loadingPodsForJob === job.name}
                     title="View logs"
@@ -1103,6 +1149,15 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
           onClose={() => setSelectedPodsForLogsJob(null)}
         />
       )}
+
+      {selectedJobForDescribe && (
+        <ResourceDescribeViewer
+          resourceType="job"
+          name={selectedJobForDescribe.name}
+          namespace={selectedJobForDescribe.namespace}
+          onClose={() => setSelectedJobForDescribe(null)}
+        />
+      )}
     </>
   );
 }
@@ -1119,6 +1174,7 @@ function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any)
   const [cronjobToDelete, setCronjobToDelete] = useState<string | null>(null);
   const [cronjobToSuspend, setCronjobToSuspend] = useState<string | null>(null);
   const [cronjobToResume, setCronjobToResume] = useState<string | null>(null);
+  const [selectedCronJobForDescribe, setSelectedCronJobForDescribe] = useState<{name: string; namespace: string} | null>(null);
 
   const handleSuspendCronJob = (cronjobName: string) => {
     setCronjobToSuspend(cronjobName);
@@ -1265,6 +1321,14 @@ function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any)
                   >
                     <Code className="w-4 h-4" />
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedCronJobForDescribe({name: cj.name, namespace: cj.namespace})}
+                    title="Describe"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
                   {cj.suspend ? (
                     <Button
                       variant="outline"
@@ -1373,6 +1437,15 @@ function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any)
             </div>
           </div>
         </div>
+      )}
+
+      {selectedCronJobForDescribe && (
+        <ResourceDescribeViewer
+          resourceType="cronjob"
+          name={selectedCronJobForDescribe.name}
+          namespace={selectedCronJobForDescribe.namespace}
+          onClose={() => setSelectedCronJobForDescribe(null)}
+        />
       )}
     </>
   );

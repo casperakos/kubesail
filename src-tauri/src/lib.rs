@@ -68,6 +68,12 @@ pub fn run() {
             commands::start_port_forward,
             commands::stop_port_forward,
             commands::list_port_forwards,
+            commands::cordon_node,
+            commands::uncordon_node,
+            commands::drain_node,
+            commands::delete_node,
+            commands::describe_node,
+            commands::describe_resource,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

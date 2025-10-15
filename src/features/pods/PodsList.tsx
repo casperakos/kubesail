@@ -14,6 +14,7 @@ import { Button } from "../../components/ui/Button";
 import { Trash2, RefreshCw, FileText, Code, Search, X, ArrowRightLeft, ScrollText } from "lucide-react";
 import { LogsViewer } from "../logs/LogsViewer";
 import { YamlViewer } from "../../components/YamlViewer";
+import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
 import { PortForwardModal } from "../../components/PortForwardModal";
 
 export function PodsList() {
@@ -25,6 +26,9 @@ export function PodsList() {
     null
   );
   const [selectedPodForYaml, setSelectedPodForYaml] = useState<{name: string; namespace: string} | null>(
+    null
+  );
+  const [selectedPodForDescribe, setSelectedPodForDescribe] = useState<{name: string; namespace: string} | null>(
     null
   );
   const [selectedPodForPortForward, setSelectedPodForPortForward] = useState<{
@@ -324,6 +328,14 @@ export function PodsList() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    onClick={() => setSelectedPodForDescribe({name: pod.name, namespace: pod.namespace})}
+                    title="Describe"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setSelectedPodForLogs({name: pod.name, namespace: pod.namespace})}
                     title="View logs"
                   >
@@ -360,6 +372,15 @@ export function PodsList() {
           resourceName={selectedPodForYaml.name}
           namespace={selectedPodForYaml.namespace}
           onClose={() => setSelectedPodForYaml(null)}
+        />
+      )}
+
+      {selectedPodForDescribe && (
+        <ResourceDescribeViewer
+          resourceType="pod"
+          name={selectedPodForDescribe.name}
+          namespace={selectedPodForDescribe.namespace}
+          onClose={() => setSelectedPodForDescribe(null)}
         />
       )}
 

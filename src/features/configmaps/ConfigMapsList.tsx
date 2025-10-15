@@ -11,9 +11,10 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Eye, Search, X, Code, Trash2 } from "lucide-react";
+import { RefreshCw, Eye, Search, X, Code, Trash2, FileText } from "lucide-react";
 import { ConfigMapInfo } from "../../types";
 import { YamlViewer } from "../../components/YamlViewer";
+import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
 
 export function ConfigMapsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
@@ -23,6 +24,7 @@ export function ConfigMapsList() {
   const [selectedConfigMap, setSelectedConfigMap] = useState<ConfigMapInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedResource, setSelectedResource] = useState<{name: string; namespace: string} | null>(null);
+  const [selectedConfigMapForDescribe, setSelectedConfigMapForDescribe] = useState<{name: string; namespace: string} | null>(null);
   const [configmapToDelete, setConfigmapToDelete] = useState<string | null>(null);
 
   const handleDelete = (configmapName: string) => {
@@ -165,6 +167,14 @@ export function ConfigMapsList() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    onClick={() => setSelectedConfigMapForDescribe({name: cm.name, namespace: cm.namespace})}
+                    title="Describe"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setSelectedConfigMap(cm)}
                     title="View data"
                   >
@@ -193,6 +203,15 @@ export function ConfigMapsList() {
           resourceName={selectedResource.name}
           namespace={selectedResource.namespace}
           onClose={() => setSelectedResource(null)}
+        />
+      )}
+
+      {selectedConfigMapForDescribe && (
+        <ResourceDescribeViewer
+          resourceType="configmap"
+          name={selectedConfigMapForDescribe.name}
+          namespace={selectedConfigMapForDescribe.namespace}
+          onClose={() => setSelectedConfigMapForDescribe(null)}
         />
       )}
 

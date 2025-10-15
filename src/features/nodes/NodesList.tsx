@@ -3,8 +3,11 @@ import { useNodes } from "../../hooks/useKube";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/Table";
-import { RefreshCw, Search, X, Cpu, MemoryStick, Server, Box, Activity, ExternalLink, HardDrive, Network, Calendar } from "lucide-react";
+import { RefreshCw, Search, X, Cpu, MemoryStick, Server, Box, Activity, ExternalLink, HardDrive, Network, Calendar, Code, Ban, CircleSlash, Unplug, Trash2, FileText } from "lucide-react";
 import { NodeInfo } from "../../types";
+import { YamlViewer } from "../../components/YamlViewer";
+import { api } from "../../lib/api";
+import { useAppStore } from "../../lib/store";
 
 // Utility functions to parse and format resources
 const parseMemory = (mem: string): number => {
@@ -103,15 +106,78 @@ function ResourceBar({ label, allocatable, capacity, isMemory = false, icon }: R
 interface NodeDetailModalProps {
   node: NodeInfo | null;
   onClose: () => void;
+  onViewYaml: (node: NodeInfo) => void;
+  onViewDescribe: (node: NodeInfo) => void;
 }
 
-function NodeDetailModal({ node, onClose }: NodeDetailModalProps) {
+function NodeDetailModal({ node, onClose, onViewYaml, onViewDescribe }: NodeDetailModalProps) {
+  const [isOperating, setIsOperating] = useState(false);
+  const [operationError, setOperationError] = useState<string | null>(null);
+
   if (!node) return null;
 
   const getStatusVariant = (status: string): "success" | "destructive" | "secondary" => {
     if (status === "Ready") return "success";
     if (status === "NotReady") return "destructive";
     return "secondary";
+  };
+
+  const handleCordon = async () => {
+    setIsOperating(true);
+    setOperationError(null);
+    try {
+      await api.cordonNode(node.name);
+      onClose(); // Close modal on success to refresh the list
+    } catch (err) {
+      setOperationError(err instanceof Error ? err.message : "Failed to cordon node");
+    } finally {
+      setIsOperating(false);
+    }
+  };
+
+  const handleUncordon = async () => {
+    setIsOperating(true);
+    setOperationError(null);
+    try {
+      await api.uncordonNode(node.name);
+      onClose(); // Close modal on success to refresh the list
+    } catch (err) {
+      setOperationError(err instanceof Error ? err.message : "Failed to uncordon node");
+    } finally {
+      setIsOperating(false);
+    }
+  };
+
+  const handleDrain = async () => {
+    if (!confirm(`Are you sure you want to drain node "${node.name}"? This will evict all pods from this node.`)) {
+      return;
+    }
+    setIsOperating(true);
+    setOperationError(null);
+    try {
+      await api.drainNode(node.name);
+      onClose(); // Close modal on success to refresh the list
+    } catch (err) {
+      setOperationError(err instanceof Error ? err.message : "Failed to drain node");
+    } finally {
+      setIsOperating(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`Are you sure you want to DELETE node "${node.name}"? This action cannot be undone!`)) {
+      return;
+    }
+    setIsOperating(true);
+    setOperationError(null);
+    try {
+      await api.deleteNode(node.name);
+      onClose(); // Close modal on success to refresh the list
+    } catch (err) {
+      setOperationError(err instanceof Error ? err.message : "Failed to delete node");
+    } finally {
+      setIsOperating(false);
+    }
   };
 
   // Handle ESC key to close modal
@@ -155,14 +221,80 @@ function NodeDetailModal({ node, onClose }: NodeDetailModalProps) {
                 )}
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => onViewDescribe(node)}>
+                <FileText className="w-4 h-4 mr-2" />
+                Describe
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => onViewYaml(node)}>
+                <Code className="w-4 h-4 mr-2" />
+                YAML
+              </Button>
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
         {/* Content */}
         <div className="p-6 space-y-6">
+          {/* Node Operations Section */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Server className="w-5 h-5 text-primary" />
+              Node Operations
+            </h3>
+
+            {operationError && (
+              <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/50 text-destructive text-sm">
+                {operationError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <Button
+                variant="outline"
+                onClick={handleCordon}
+                disabled={isOperating}
+                className="flex items-center gap-2"
+              >
+                <Ban className="w-4 h-4" />
+                Cordon
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={handleUncordon}
+                disabled={isOperating}
+                className="flex items-center gap-2"
+              >
+                <CircleSlash className="w-4 h-4" />
+                Uncordon
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={handleDrain}
+                disabled={isOperating}
+                className="flex items-center gap-2 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10"
+              >
+                <Unplug className="w-4 h-4" />
+                Drain
+              </Button>
+
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isOperating}
+                className="flex items-center gap-2"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </Button>
+            </div>
+          </div>
+
           {/* Resource Capacity Section */}
           <div>
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -415,10 +547,99 @@ function NodeDetailModal({ node, onClose }: NodeDetailModalProps) {
   );
 }
 
+// Node Describe Viewer Component
+interface NodeDescribeViewerProps {
+  nodeName: string;
+  onClose: () => void;
+}
+
+function NodeDescribeViewer({ nodeName, onClose }: NodeDescribeViewerProps) {
+  const theme = useAppStore((state) => state.theme);
+  const [description, setDescription] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDescription = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const desc = await api.describeNode(nodeName);
+        setDescription(desc);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to fetch node description");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDescription();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [nodeName, onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-gradient-to-br from-card/95 to-card/90 border border-border/50 rounded-xl shadow-2xl w-full max-w-6xl h-[80vh] flex flex-col backdrop-blur-xl animate-slide-in">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border/50 bg-gradient-to-r from-background/50 to-background/30">
+          <div>
+            <h2 className="text-lg font-semibold">Node Description</h2>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-sm font-mono">{nodeName}</span>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6 bg-gradient-to-br from-muted/30 to-muted/20">
+          {loading && (
+            <div className="flex items-center justify-center h-full">
+              <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-destructive text-center">
+                <p className="font-semibold mb-2">Error loading description</p>
+                <p className="text-sm">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {!loading && !error && description && (
+            <pre className="font-mono text-sm whitespace-pre-wrap break-words">
+              {description}
+            </pre>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between p-4 border-t border-border/50 bg-gradient-to-r from-background/50 to-background/30 text-sm text-muted-foreground">
+          <span>{description.split("\n").length} lines</span>
+          <span>Press Esc to close</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function NodesList() {
   const { data: nodes, isLoading, error, refetch } = useNodes();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNode, setSelectedNode] = useState<NodeInfo | null>(null);
+  const [selectedNodeForYaml, setSelectedNodeForYaml] = useState<NodeInfo | null>(null);
+  const [selectedNodeForDescribe, setSelectedNodeForDescribe] = useState<NodeInfo | null>(null);
 
   const getStatusVariant = (status: string): "success" | "destructive" | "secondary" => {
     if (status === "Ready") return "success";
@@ -661,7 +882,34 @@ export function NodesList() {
       </div>
 
       {/* Detail Modal */}
-      {selectedNode && <NodeDetailModal node={selectedNode} onClose={() => setSelectedNode(null)} />}
+      {selectedNode && (
+        <NodeDetailModal
+          node={selectedNode}
+          onClose={() => setSelectedNode(null)}
+          onViewYaml={(node) => {
+            setSelectedNodeForYaml(node);
+            setSelectedNode(null);
+          }}
+          onViewDescribe={(node) => {
+            setSelectedNodeForDescribe(node);
+            setSelectedNode(null);
+          }}
+        />
+      )}
+      {selectedNodeForYaml && (
+        <YamlViewer
+          resourceType="node"
+          resourceName={selectedNodeForYaml.name}
+          namespace=""
+          onClose={() => setSelectedNodeForYaml(null)}
+        />
+      )}
+      {selectedNodeForDescribe && (
+        <NodeDescribeViewer
+          nodeName={selectedNodeForDescribe.name}
+          onClose={() => setSelectedNodeForDescribe(null)}
+        />
+      )}
     </>
   );
 }

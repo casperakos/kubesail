@@ -906,6 +906,11 @@ pub async fn get_resource_yaml(
             let sa = sas.get(name).await?;
             serde_yaml::to_string(&sa)?
         }
+        "node" => {
+            let nodes: Api<Node> = Api::all(client);
+            let node = nodes.get(name).await?;
+            serde_yaml::to_string(&node)?
+        }
         _ => return Err(anyhow::anyhow!("Unsupported resource type: {}", resource_type)),
     };
 
@@ -1361,6 +1366,336 @@ pub async fn list_nodes(client: Client) -> Result<Vec<NodeInfo>> {
     }
 
     Ok(result)
+}
+
+// Node Operations
+pub async fn cordon_node(client: Client, node_name: &str) -> Result<()> {
+    use k8s_openapi::api::core::v1::Node;
+    use kube::api::{Patch, PatchParams};
+    use serde_json::json;
+
+    let nodes: Api<Node> = Api::all(client);
+    let patch = json!({
+        "spec": {
+            "unschedulable": true
+        }
+    });
+
+    nodes.patch(node_name, &PatchParams::default(), &Patch::Merge(patch)).await?;
+    Ok(())
+}
+
+pub async fn uncordon_node(client: Client, node_name: &str) -> Result<()> {
+    use k8s_openapi::api::core::v1::Node;
+    use kube::api::{Patch, PatchParams};
+    use serde_json::json;
+
+    let nodes: Api<Node> = Api::all(client);
+    let patch = json!({
+        "spec": {
+            "unschedulable": false
+        }
+    });
+
+    nodes.patch(node_name, &PatchParams::default(), &Patch::Merge(patch)).await?;
+    Ok(())
+}
+
+pub async fn drain_node(client: Client, node_name: &str) -> Result<()> {
+    use k8s_openapi::api::core::v1::Pod;
+    use kube::api::EvictParams;
+
+    // First, cordon the node
+    cordon_node(client.clone(), node_name).await?;
+
+    // Get all pods on this node
+    let pods: Api<Pod> = Api::all(client.clone());
+    let lp = ListParams::default().fields(&format!("spec.nodeName={}", node_name));
+    let pod_list = pods.list(&lp).await?;
+
+    // Evict each pod
+    for pod in pod_list {
+        let pod_name = pod.metadata.name.unwrap_or_default();
+        let pod_namespace = pod.metadata.namespace.unwrap_or_default();
+
+        // Skip daemonset pods (they can't be evicted)
+        if let Some(owner_refs) = &pod.metadata.owner_references {
+            if owner_refs.iter().any(|r| r.kind == "DaemonSet") {
+                continue;
+            }
+        }
+
+        // Skip static pods (identified by having no controller)
+        if pod.metadata.owner_references.is_none() {
+            continue;
+        }
+
+        let pods_ns: Api<Pod> = Api::namespaced(client.clone(), &pod_namespace);
+        let evict_params = EvictParams::default();
+
+        // Try to evict the pod
+        if let Err(e) = pods_ns.evict(&pod_name, &evict_params).await {
+            eprintln!("Failed to evict pod {}/{}: {}", pod_namespace, pod_name, e);
+        }
+    }
+
+    Ok(())
+}
+
+pub async fn delete_node(client: Client, node_name: &str) -> Result<()> {
+    use k8s_openapi::api::core::v1::Node;
+    use kube::api::DeleteParams;
+
+    let nodes: Api<Node> = Api::all(client);
+    nodes.delete(node_name, &DeleteParams::default()).await?;
+    Ok(())
+}
+
+pub async fn describe_node(client: Client, node_name: &str) -> Result<String> {
+    use k8s_openapi::api::core::v1::{Node, Pod};
+
+    let nodes: Api<Node> = Api::all(client.clone());
+    let node = nodes.get(node_name).await?;
+
+    let mut description = String::new();
+
+    // Basic Info
+    description.push_str(&format!("Name: {}\n", node_name));
+    description.push_str(&format!("Roles: {}\n",
+        node.metadata.labels.as_ref()
+            .and_then(|labels| {
+                let roles: Vec<String> = labels.keys()
+                    .filter(|k| k.starts_with("node-role.kubernetes.io/"))
+                    .map(|k| k.strip_prefix("node-role.kubernetes.io/").unwrap_or(k).to_string())
+                    .collect();
+                if roles.is_empty() { None } else { Some(roles.join(", ")) }
+            })
+            .unwrap_or_else(|| "<none>".to_string())
+    ));
+
+    // Labels
+    description.push_str("\nLabels:\n");
+    if let Some(labels) = &node.metadata.labels {
+        for (key, value) in labels {
+            description.push_str(&format!("  {}={}\n", key, value));
+        }
+    }
+
+    // Annotations
+    description.push_str("\nAnnotations:\n");
+    if let Some(annotations) = &node.metadata.annotations {
+        for (key, value) in annotations {
+            description.push_str(&format!("  {}={}\n", key, value));
+        }
+    }
+
+    // Taints
+    description.push_str("\nTaints:\n");
+    if let Some(taints) = node.spec.as_ref().and_then(|s| s.taints.as_ref()) {
+        for taint in taints {
+            description.push_str(&format!("  {}={}:{}\n",
+                taint.key,
+                taint.value.as_ref().unwrap_or(&"".to_string()),
+                taint.effect
+            ));
+        }
+    } else {
+        description.push_str("  <none>\n");
+    }
+
+    // Unschedulable
+    if let Some(unschedulable) = node.spec.as_ref().and_then(|s| s.unschedulable) {
+        if unschedulable {
+            description.push_str("\nUnschedulable: true\n");
+        }
+    }
+
+    // Conditions
+    description.push_str("\nConditions:\n");
+    if let Some(conditions) = node.status.as_ref().and_then(|s| s.conditions.as_ref()) {
+        for condition in conditions {
+            description.push_str(&format!("  {} {} ({})\n    Reason: {}\n    Message: {}\n",
+                condition.type_,
+                condition.status,
+                condition.last_transition_time.as_ref()
+                    .map(|t| format_age(&t.0))
+                    .unwrap_or_else(|| "Unknown".to_string()),
+                condition.reason.as_ref().unwrap_or(&"".to_string()),
+                condition.message.as_ref().unwrap_or(&"".to_string())
+            ));
+        }
+    }
+
+    // Addresses
+    description.push_str("\nAddresses:\n");
+    if let Some(addresses) = node.status.as_ref().and_then(|s| s.addresses.as_ref()) {
+        for addr in addresses {
+            description.push_str(&format!("  {}: {}\n", addr.type_, addr.address));
+        }
+    }
+
+    // Capacity and Allocatable
+    description.push_str("\nCapacity:\n");
+    if let Some(capacity) = node.status.as_ref().and_then(|s| s.capacity.as_ref()) {
+        for (key, value) in capacity {
+            description.push_str(&format!("  {}: {}\n", key, value.0));
+        }
+    }
+
+    description.push_str("\nAllocatable:\n");
+    if let Some(allocatable) = node.status.as_ref().and_then(|s| s.allocatable.as_ref()) {
+        for (key, value) in allocatable {
+            description.push_str(&format!("  {}: {}\n", key, value.0));
+        }
+    }
+
+    // System Info
+    if let Some(node_info) = node.status.as_ref().and_then(|s| s.node_info.as_ref()) {
+        description.push_str("\nSystem Info:\n");
+        description.push_str(&format!("  OS Image: {}\n", node_info.os_image));
+        description.push_str(&format!("  Kernel Version: {}\n", node_info.kernel_version));
+        description.push_str(&format!("  Container Runtime: {}\n", node_info.container_runtime_version));
+        description.push_str(&format!("  Kubelet Version: {}\n", node_info.kubelet_version));
+        description.push_str(&format!("  Kube-Proxy Version: {}\n", node_info.kube_proxy_version));
+    }
+
+    // Get pods running on this node
+    description.push_str("\nNon-terminated Pods:\n");
+    let pods: Api<Pod> = Api::all(client.clone());
+    let lp = ListParams::default().fields(&format!("spec.nodeName={}", node_name));
+    if let Ok(pod_list) = pods.list(&lp).await {
+        let mut total_cpu = 0i64;
+        let mut total_memory = 0i64;
+
+        for pod in &pod_list {
+            let pod_name = pod.metadata.name.as_deref().unwrap_or("unknown");
+            let pod_ns = pod.metadata.namespace.as_deref().unwrap_or("default");
+
+            // Calculate resource requests
+            if let Some(spec) = &pod.spec {
+                for container in &spec.containers {
+                        if let Some(resources) = &container.resources {
+                            if let Some(requests) = &resources.requests {
+                                if let Some(cpu) = requests.get("cpu") {
+                                    let cpu_str = &cpu.0;
+                                    if cpu_str.ends_with('m') {
+                                        if let Ok(val) = cpu_str.trim_end_matches('m').parse::<i64>() {
+                                            total_cpu += val;
+                                        }
+                                    } else if let Ok(val) = cpu_str.parse::<i64>() {
+                                        total_cpu += val * 1000;
+                                    }
+                                }
+                                if let Some(mem) = requests.get("memory") {
+                                    let mem_str = &mem.0;
+                                    if mem_str.ends_with("Ki") {
+                                        if let Ok(val) = mem_str.trim_end_matches("Ki").parse::<i64>() {
+                                            total_memory += val;
+                                        }
+                                    } else if mem_str.ends_with("Mi") {
+                                        if let Ok(val) = mem_str.trim_end_matches("Mi").parse::<i64>() {
+                                            total_memory += val * 1024;
+                                        }
+                                    } else if mem_str.ends_with("Gi") {
+                                        if let Ok(val) = mem_str.trim_end_matches("Gi").parse::<i64>() {
+                                            total_memory += val * 1024 * 1024;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+            }
+
+            description.push_str(&format!("  {}/{}\n", pod_ns, pod_name));
+        }
+
+        description.push_str(&format!("\nAllocated resources:\n"));
+        description.push_str(&format!("  CPU Requests: {}m\n", total_cpu));
+        description.push_str(&format!("  Memory Requests: {}Ki\n", total_memory));
+        description.push_str(&format!("  Total Pods: {}\n", pod_list.items.len()));
+    }
+
+    // Events
+    description.push_str("\nEvents:\n");
+    let events: Api<Event> = Api::all(client);
+    let event_lp = ListParams::default().fields(&format!("involvedObject.name={}", node_name));
+    if let Ok(event_list) = events.list(&event_lp).await {
+        if event_list.items.is_empty() {
+            description.push_str("  <none>\n");
+        } else {
+            for event in event_list.items.iter().take(10) {
+                let event_type = event.type_.as_deref().unwrap_or("Normal");
+                let reason = event.reason.as_deref().unwrap_or("");
+                let message = event.message.as_deref().unwrap_or("");
+                let age = event.last_timestamp.as_ref()
+                    .map(|ts| format_age(&ts.0))
+                    .unwrap_or_else(|| "Unknown".to_string());
+
+                description.push_str(&format!("  {} {} ({} ago)\n    {}\n",
+                    event_type, reason, age, message
+                ));
+            }
+        }
+    }
+
+    Ok(description)
+}
+
+pub async fn describe_resource(
+    client: Client,
+    resource_type: &str,
+    namespace: Option<&str>,
+    name: &str,
+) -> Result<String> {
+    use k8s_openapi::api::core::v1::Event;
+    use kube::api::ListParams;
+
+    // Get the resource YAML first
+    let yaml = get_resource_yaml(client.clone(), resource_type, namespace, name).await?;
+
+    let mut description = String::new();
+    description.push_str(&format!("Name: {}\n", name));
+    if let Some(ns) = namespace {
+        description.push_str(&format!("Namespace: {}\n", ns));
+    }
+    description.push_str(&format!("Type: {}\n", resource_type));
+    description.push_str("\n");
+
+    // Add resource-specific information based on type
+    description.push_str("Details:\n");
+    description.push_str(&yaml);
+    description.push_str("\n\n");
+
+    // Get events related to this resource
+    description.push_str("Events:\n");
+    let events: Api<Event> = if let Some(ns) = namespace {
+        Api::namespaced(client, ns)
+    } else {
+        Api::all(client)
+    };
+
+    let event_lp = ListParams::default().fields(&format!("involvedObject.name={}", name));
+    if let Ok(event_list) = events.list(&event_lp).await {
+        if event_list.items.is_empty() {
+            description.push_str("  <none>\n");
+        } else {
+            for event in event_list.items.iter().take(10) {
+                let event_type = event.type_.as_deref().unwrap_or("Normal");
+                let reason = event.reason.as_deref().unwrap_or("");
+                let message = event.message.as_deref().unwrap_or("");
+                let age = event.last_timestamp.as_ref()
+                    .map(|ts| format_age(&ts.0))
+                    .unwrap_or_else(|| "Unknown".to_string());
+
+                description.push_str(&format!("  {} {} ({} ago)\n    {}\n",
+                    event_type, reason, age, message
+                ));
+            }
+        }
+    }
+
+    Ok(description)
 }
 
 pub async fn list_events(client: Client, namespace: &str) -> Result<Vec<EventInfo>> {

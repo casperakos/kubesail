@@ -11,9 +11,10 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Eye, EyeOff, Search, X, Code, Trash2 } from "lucide-react";
+import { RefreshCw, Eye, EyeOff, Search, X, Code, Trash2, FileText } from "lucide-react";
 import { SecretInfo } from "../../types";
 import { YamlViewer } from "../../components/YamlViewer";
+import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
 
 export function SecretsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
@@ -23,6 +24,7 @@ export function SecretsList() {
   const [selectedSecret, setSelectedSecret] = useState<SecretInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedResource, setSelectedResource] = useState<{name: string; namespace: string} | null>(null);
+  const [selectedSecretForDescribe, setSelectedSecretForDescribe] = useState<{name: string; namespace: string} | null>(null);
   const [secretToDelete, setSecretToDelete] = useState<string | null>(null);
 
   const handleDelete = (secretName: string) => {
@@ -178,6 +180,14 @@ export function SecretsList() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    onClick={() => setSelectedSecretForDescribe({name: secret.name, namespace: secret.namespace})}
+                    title="Describe"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setSelectedSecret(secret)}
                     title="View secret data"
                   >
@@ -206,6 +216,15 @@ export function SecretsList() {
           resourceName={selectedResource.name}
           namespace={selectedResource.namespace}
           onClose={() => setSelectedResource(null)}
+        />
+      )}
+
+      {selectedSecretForDescribe && (
+        <ResourceDescribeViewer
+          resourceType="secret"
+          name={selectedSecretForDescribe.name}
+          namespace={selectedSecretForDescribe.namespace}
+          onClose={() => setSelectedSecretForDescribe(null)}
         />
       )}
 

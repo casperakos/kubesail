@@ -10,9 +10,10 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, Code, ArrowRightLeft, Trash2 } from "lucide-react";
+import { RefreshCw, Search, X, Code, ArrowRightLeft, Trash2, FileText } from "lucide-react";
 import { useState, useMemo } from "react";
 import { YamlViewer } from "../../components/YamlViewer";
+import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
 import { PortForwardModal } from "../../components/PortForwardModal";
 
 export function ServicesList() {
@@ -22,6 +23,7 @@ export function ServicesList() {
   const deleteService = useDeleteService();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedResource, setSelectedResource] = useState<{name: string; namespace: string} | null>(null);
+  const [selectedServiceForDescribe, setSelectedServiceForDescribe] = useState<{name: string; namespace: string} | null>(null);
   const [selectedServiceForPortForward, setSelectedServiceForPortForward] = useState<{name: string; namespace: string} | null>(null);
   const [serviceToDelete, setServiceToDelete] = useState<string | null>(null);
 
@@ -231,6 +233,14 @@ export function ServicesList() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    onClick={() => setSelectedServiceForDescribe({name: service.name, namespace: service.namespace})}
+                    title="Describe"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => handleDelete(service.name)}
                     disabled={deleteService.isPending}
                     title="Delete service"
@@ -251,6 +261,15 @@ export function ServicesList() {
           resourceName={selectedResource.name}
           namespace={selectedResource.namespace}
           onClose={() => setSelectedResource(null)}
+        />
+      )}
+
+      {selectedServiceForDescribe && (
+        <ResourceDescribeViewer
+          resourceType="service"
+          name={selectedServiceForDescribe.name}
+          namespace={selectedServiceForDescribe.namespace}
+          onClose={() => setSelectedServiceForDescribe(null)}
         />
       )}
 

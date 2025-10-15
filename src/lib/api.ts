@@ -305,6 +305,38 @@ export const api = {
     return await invoke("get_nodes");
   },
 
+  async cordonNode(nodeName: string): Promise<void> {
+    return await invoke("cordon_node", { nodeName });
+  },
+
+  async uncordonNode(nodeName: string): Promise<void> {
+    return await invoke("uncordon_node", { nodeName });
+  },
+
+  async drainNode(nodeName: string): Promise<void> {
+    return await invoke("drain_node", { nodeName });
+  },
+
+  async deleteNode(nodeName: string): Promise<void> {
+    return await invoke("delete_node", { nodeName });
+  },
+
+  async describeNode(nodeName: string): Promise<string> {
+    return await invoke("describe_node", { nodeName });
+  },
+
+  async describeResource(
+    resourceType: string,
+    namespace: string | undefined,
+    name: string
+  ): Promise<string> {
+    return await invoke("describe_resource", {
+      resourceType,
+      namespace,
+      name,
+    });
+  },
+
   // Event operations
   async getEvents(namespace: string): Promise<EventInfo[]> {
     return await invoke("get_events", { namespace });

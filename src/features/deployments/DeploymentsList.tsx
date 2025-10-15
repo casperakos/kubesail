@@ -13,6 +13,7 @@ import { Button } from "../../components/ui/Button";
 import { RefreshCw, Search, X, FileText, RotateCw, Trash2, Code, ScrollText } from "lucide-react";
 import { useState, useMemo } from "react";
 import { YamlViewer } from "../../components/YamlViewer";
+import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { PodSelectorModal } from "../../components/PodSelectorModal";
@@ -30,6 +31,7 @@ export function DeploymentsList() {
   const [restartingDeployment, setRestartingDeployment] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDeployment, setSelectedDeployment] = useState<{name: string; namespace: string} | null>(null);
+  const [selectedDeploymentForDescribe, setSelectedDeploymentForDescribe] = useState<{name: string; namespace: string} | null>(null);
   const [deploymentToDelete, setDeploymentToDelete] = useState<string | null>(null);
   const [deploymentToScale, setDeploymentToScale] = useState<{
     name: string;
@@ -310,6 +312,14 @@ export function DeploymentsList() {
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={() => setSelectedDeploymentForDescribe({name: deployment.name, namespace: deployment.namespace})}
+                      title="Describe"
+                    >
+                      <FileText className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleViewLogs(deployment.name, deployment.namespace)}
                       disabled={loadingPodsFor === deployment.name}
                       title="View logs"
@@ -361,6 +371,15 @@ export function DeploymentsList() {
           resourceName={selectedDeployment.name}
           namespace={selectedDeployment.namespace}
           onClose={() => setSelectedDeployment(null)}
+        />
+      )}
+
+      {selectedDeploymentForDescribe && (
+        <ResourceDescribeViewer
+          resourceType="deployment"
+          name={selectedDeploymentForDescribe.name}
+          namespace={selectedDeploymentForDescribe.namespace}
+          onClose={() => setSelectedDeploymentForDescribe(null)}
         />
       )}
 

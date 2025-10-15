@@ -725,3 +725,101 @@ pub async fn list_port_forwards(
 ) -> Result<Vec<crate::types::PortForwardInfo>, String> {
     Ok(portforward_manager.list_port_forwards().await)
 }
+
+// Node Operations
+#[tauri::command]
+pub async fn cordon_node(
+    node_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::cordon_node(client, &node_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn uncordon_node(
+    node_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::uncordon_node(client, &node_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn drain_node(
+    node_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::drain_node(client, &node_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_node(
+    node_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::delete_node(client, &node_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn describe_node(
+    node_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<String, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::describe_node(client, &node_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn describe_resource(
+    resource_type: String,
+    namespace: Option<String>,
+    name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<String, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::describe_resource(
+        client,
+        &resource_type,
+        namespace.as_deref(),
+        &name,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
