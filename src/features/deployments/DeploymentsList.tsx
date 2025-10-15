@@ -15,6 +15,9 @@ import { useState, useMemo } from "react";
 import { YamlViewer } from "../../components/YamlViewer";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
+import { PodSelectorModal } from "../../components/PodSelectorModal";
+import { LogsViewer } from "../logs/LogsViewer";
+import { PodInfo } from "../../types";
 
 export function DeploymentsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
@@ -34,6 +37,10 @@ export function DeploymentsList() {
   } | null>(null);
   const [newReplicaCount, setNewReplicaCount] = useState("");
   const [deploymentToRestart, setDeploymentToRestart] = useState<string | null>(null);
+  const [loadingPodsFor, setLoadingPodsFor] = useState<string | null>(null);
+  const [selectedPodsForLogs, setSelectedPodsForLogs] = useState<Array<{name: string; namespace: string}> | null>(null);
+  const [selectedPodForLogs, setSelectedPodForLogs] = useState<{name: string; namespace: string} | null>(null);
+  const [podsForSelection, setPodsForSelection] = useState<PodInfo[] | null>(null);
 
   const restartDeploymentMutation = useMutation({
     mutationFn: ({ namespace, deploymentName }: { namespace: string; deploymentName: string }) =>
@@ -122,6 +129,32 @@ export function DeploymentsList() {
 
   const cancelDelete = () => {
     setDeploymentToDelete(null);
+  };
+
+  const handleViewLogs = async (resourceName: string, resourceNamespace: string) => {
+    setLoadingPodsFor(resourceName);
+    try {
+      const pods = await api.getPodsForResource(
+        "deployment",
+        resourceName,
+        resourceNamespace
+      );
+
+      if (pods.length === 0) {
+        alert("No pods found for this deployment");
+      } else if (pods.length === 1) {
+        // Single pod - show logs directly
+        setSelectedPodForLogs({ name: pods[0].name, namespace: pods[0].namespace });
+      } else {
+        // Multiple pods - show pod selector
+        setPodsForSelection(pods);
+      }
+    } catch (error) {
+      console.error("Failed to get pods:", error);
+      alert(`Failed to get pods: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setLoadingPodsFor(null);
+    }
   };
 
   // Filter deployments based on search query
@@ -275,6 +308,19 @@ export function DeploymentsList() {
                       <FileText className="w-4 h-4" />
                     </Button>
                     <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleViewLogs(deployment.name, deployment.namespace)}
+                      disabled={loadingPodsFor === deployment.name}
+                      title="View logs"
+                    >
+                      {loadingPodsFor === deployment.name ? (
+                        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <FileText className="w-4 h-4" />
+                      )}
+                    </Button>
+                    <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleRestart(deployment.name)}
@@ -315,6 +361,39 @@ export function DeploymentsList() {
           resourceName={selectedDeployment.name}
           namespace={selectedDeployment.namespace}
           onClose={() => setSelectedDeployment(null)}
+        />
+      )}
+
+      {podsForSelection && (
+        <PodSelectorModal
+          pods={podsForSelection}
+          resourceType="deployment"
+          resourceName={podsForSelection[0]?.name.split('-')[0] || ''}
+          onSelectPod={(podName, namespace) => {
+            setSelectedPodForLogs({ name: podName, namespace });
+            setPodsForSelection(null);
+          }}
+          onSelectAllPods={(pods) => {
+            setSelectedPodsForLogs(pods);
+            setPodsForSelection(null);
+          }}
+          onClose={() => setPodsForSelection(null)}
+        />
+      )}
+
+      {selectedPodForLogs && (
+        <LogsViewer
+          namespace={selectedPodForLogs.namespace}
+          podName={selectedPodForLogs.name}
+          onClose={() => setSelectedPodForLogs(null)}
+        />
+      )}
+
+      {selectedPodsForLogs && (
+        <LogsViewer
+          namespace={selectedPodsForLogs[0].namespace}
+          pods={selectedPodsForLogs}
+          onClose={() => setSelectedPodsForLogs(null)}
         />
       )}
 

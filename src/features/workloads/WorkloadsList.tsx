@@ -29,6 +29,9 @@ import { RefreshCw, Search, X, FileText, RotateCw, Trash2, Pause, Play } from "l
 import { YamlViewer } from "../../components/YamlViewer";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
+import { PodSelectorModal } from "../../components/PodSelectorModal";
+import { LogsViewer } from "../logs/LogsViewer";
+import { PodInfo } from "../../types";
 
 type WorkloadType = "statefulsets" | "daemonsets" | "jobs" | "cronjobs";
 
@@ -246,6 +249,10 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
   } | null>(null);
   const [newReplicaCount, setNewReplicaCount] = useState("");
   const [statefulsetToRestart, setStatefulsetToRestart] = useState<string | null>(null);
+  const [loadingPodsFor, setLoadingPodsFor] = useState<string | null>(null);
+  const [selectedPodsForLogs, setSelectedPodsForLogs] = useState<Array<{name: string; namespace: string}> | null>(null);
+  const [selectedPodForLogs, setSelectedPodForLogs] = useState<{name: string; namespace: string} | null>(null);
+  const [podsForSelection, setPodsForSelection] = useState<PodInfo[] | null>(null);
 
   const restartStatefulSetMutation = useMutation({
     mutationFn: ({ namespace, statefulsetName }: { namespace: string; statefulsetName: string }) =>
@@ -337,6 +344,32 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
     setStatefulsetToDelete(null);
   };
 
+  const handleViewLogs = async (resourceName: string, resourceNamespace: string) => {
+    setLoadingPodsFor(resourceName);
+    try {
+      const pods = await api.getPodsForResource(
+        "statefulset",
+        resourceName,
+        resourceNamespace
+      );
+
+      if (pods.length === 0) {
+        alert("No pods found for this statefulset");
+      } else if (pods.length === 1) {
+        // Single pod - show logs directly
+        setSelectedPodForLogs({ name: pods[0].name, namespace: pods[0].namespace });
+      } else {
+        // Multiple pods - show pod selector
+        setPodsForSelection(pods);
+      }
+    } catch (error) {
+      console.error("Failed to get pods:", error);
+      alert(`Failed to get pods: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setLoadingPodsFor(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -402,6 +435,19 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
                     title="View YAML"
                   >
                     <FileText className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleViewLogs(sts.name, sts.namespace)}
+                    disabled={loadingPodsFor === sts.name}
+                    title="View logs"
+                  >
+                    {loadingPodsFor === sts.name ? (
+                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <FileText className="w-4 h-4" />
+                    )}
                   </Button>
                   <Button
                     variant="outline"
@@ -520,6 +566,39 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
           </div>
         </div>
       )}
+
+      {podsForSelection && (
+        <PodSelectorModal
+          pods={podsForSelection}
+          resourceType="statefulset"
+          resourceName={podsForSelection[0]?.name.split('-')[0] || ''}
+          onSelectPod={(podName, namespace) => {
+            setSelectedPodForLogs({ name: podName, namespace });
+            setPodsForSelection(null);
+          }}
+          onSelectAllPods={(pods) => {
+            setSelectedPodsForLogs(pods);
+            setPodsForSelection(null);
+          }}
+          onClose={() => setPodsForSelection(null)}
+        />
+      )}
+
+      {selectedPodForLogs && (
+        <LogsViewer
+          namespace={selectedPodForLogs.namespace}
+          podName={selectedPodForLogs.name}
+          onClose={() => setSelectedPodForLogs(null)}
+        />
+      )}
+
+      {selectedPodsForLogs && (
+        <LogsViewer
+          namespace={selectedPodsForLogs[0].namespace}
+          pods={selectedPodsForLogs}
+          onClose={() => setSelectedPodsForLogs(null)}
+        />
+      )}
     </>
   );
 }
@@ -533,6 +612,10 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
   const [restartingDaemonSet, setRestartingDaemonSet] = useState<string | null>(null);
   const [daemonsetToDelete, setDaemonsetToDelete] = useState<string | null>(null);
   const [daemonsetToRestart, setDaemonsetToRestart] = useState<string | null>(null);
+  const [loadingPodsForDS, setLoadingPodsForDS] = useState<string | null>(null);
+  const [selectedPodsForLogsDS, setSelectedPodsForLogsDS] = useState<Array<{name: string; namespace: string}> | null>(null);
+  const [selectedPodForLogsDS, setSelectedPodForLogsDS] = useState<{name: string; namespace: string} | null>(null);
+  const [podsForSelectionDS, setPodsForSelectionDS] = useState<PodInfo[] | null>(null);
 
   const restartDaemonSetMutation = useMutation({
     mutationFn: ({ namespace, daemonsetName }: { namespace: string; daemonsetName: string }) =>
@@ -588,6 +671,32 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
 
   const cancelDeleteDaemonSet = () => {
     setDaemonsetToDelete(null);
+  };
+
+  const handleViewLogsDaemonSet = async (resourceName: string, resourceNamespace: string) => {
+    setLoadingPodsForDS(resourceName);
+    try {
+      const pods = await api.getPodsForResource(
+        "daemonset",
+        resourceName,
+        resourceNamespace
+      );
+
+      if (pods.length === 0) {
+        alert("No pods found for this daemonset");
+      } else if (pods.length === 1) {
+        // Single pod - show logs directly
+        setSelectedPodForLogsDS({ name: pods[0].name, namespace: pods[0].namespace });
+      } else {
+        // Multiple pods - show pod selector
+        setPodsForSelectionDS(pods);
+      }
+    } catch (error) {
+      console.error("Failed to get pods:", error);
+      alert(`Failed to get pods: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setLoadingPodsForDS(null);
+    }
   };
 
   if (isLoading) {
@@ -655,6 +764,19 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
                     title="View YAML"
                   >
                     <FileText className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleViewLogsDaemonSet(ds.name, ds.namespace)}
+                    disabled={loadingPodsForDS === ds.name}
+                    title="View logs"
+                  >
+                    {loadingPodsForDS === ds.name ? (
+                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <FileText className="w-4 h-4" />
+                    )}
                   </Button>
                   <Button
                     variant="outline"
@@ -728,6 +850,39 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
           </div>
         </div>
       )}
+
+      {podsForSelectionDS && (
+        <PodSelectorModal
+          pods={podsForSelectionDS}
+          resourceType="daemonset"
+          resourceName={podsForSelectionDS[0]?.name.split('-')[0] || ''}
+          onSelectPod={(podName, namespace) => {
+            setSelectedPodForLogsDS({ name: podName, namespace });
+            setPodsForSelectionDS(null);
+          }}
+          onSelectAllPods={(pods) => {
+            setSelectedPodsForLogsDS(pods);
+            setPodsForSelectionDS(null);
+          }}
+          onClose={() => setPodsForSelectionDS(null)}
+        />
+      )}
+
+      {selectedPodForLogsDS && (
+        <LogsViewer
+          namespace={selectedPodForLogsDS.namespace}
+          podName={selectedPodForLogsDS.name}
+          onClose={() => setSelectedPodForLogsDS(null)}
+        />
+      )}
+
+      {selectedPodsForLogsDS && (
+        <LogsViewer
+          namespace={selectedPodsForLogsDS[0].namespace}
+          pods={selectedPodsForLogsDS}
+          onClose={() => setSelectedPodsForLogsDS(null)}
+        />
+      )}
     </>
   );
 }
@@ -738,6 +893,10 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const showNamespaceColumn = !currentNamespace;
   const deleteJob = useDeleteJob();
   const [jobToDelete, setJobToDelete] = useState<string | null>(null);
+  const [loadingPodsForJob, setLoadingPodsForJob] = useState<string | null>(null);
+  const [selectedPodsForLogsJob, setSelectedPodsForLogsJob] = useState<Array<{name: string; namespace: string}> | null>(null);
+  const [selectedPodForLogsJob, setSelectedPodForLogsJob] = useState<{name: string; namespace: string} | null>(null);
+  const [podsForSelectionJob, setPodsForSelectionJob] = useState<PodInfo[] | null>(null);
 
   const handleDeleteJob = (jobName: string) => {
     setJobToDelete(jobName);
@@ -758,6 +917,32 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
 
   const cancelDeleteJob = () => {
     setJobToDelete(null);
+  };
+
+  const handleViewLogsJob = async (resourceName: string, resourceNamespace: string) => {
+    setLoadingPodsForJob(resourceName);
+    try {
+      const pods = await api.getPodsForResource(
+        "job",
+        resourceName,
+        resourceNamespace
+      );
+
+      if (pods.length === 0) {
+        alert("No pods found for this job");
+      } else if (pods.length === 1) {
+        // Single pod - show logs directly
+        setSelectedPodForLogsJob({ name: pods[0].name, namespace: pods[0].namespace });
+      } else {
+        // Multiple pods - show pod selector
+        setPodsForSelectionJob(pods);
+      }
+    } catch (error) {
+      console.error("Failed to get pods:", error);
+      alert(`Failed to get pods: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setLoadingPodsForJob(null);
+    }
   };
 
   if (isLoading) {
@@ -835,6 +1020,19 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => handleViewLogsJob(job.name, job.namespace)}
+                    disabled={loadingPodsForJob === job.name}
+                    title="View logs"
+                  >
+                    {loadingPodsForJob === job.name ? (
+                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <FileText className="w-4 h-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => handleDeleteJob(job.name)}
                     disabled={deleteJob.isPending}
                     title="Delete job"
@@ -871,6 +1069,39 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
             </div>
           </div>
         </div>
+      )}
+
+      {podsForSelectionJob && (
+        <PodSelectorModal
+          pods={podsForSelectionJob}
+          resourceType="job"
+          resourceName={podsForSelectionJob[0]?.name.split('-')[0] || ''}
+          onSelectPod={(podName, namespace) => {
+            setSelectedPodForLogsJob({ name: podName, namespace });
+            setPodsForSelectionJob(null);
+          }}
+          onSelectAllPods={(pods) => {
+            setSelectedPodsForLogsJob(pods);
+            setPodsForSelectionJob(null);
+          }}
+          onClose={() => setPodsForSelectionJob(null)}
+        />
+      )}
+
+      {selectedPodForLogsJob && (
+        <LogsViewer
+          namespace={selectedPodForLogsJob.namespace}
+          podName={selectedPodForLogsJob.name}
+          onClose={() => setSelectedPodForLogsJob(null)}
+        />
+      )}
+
+      {selectedPodsForLogsJob && (
+        <LogsViewer
+          namespace={selectedPodsForLogsJob[0].namespace}
+          pods={selectedPodsForLogsJob}
+          onClose={() => setSelectedPodsForLogsJob(null)}
+        />
       )}
     </>
   );

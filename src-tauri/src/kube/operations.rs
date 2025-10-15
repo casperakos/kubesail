@@ -1698,6 +1698,156 @@ pub async fn list_service_accounts(client: Client, namespace: &str) -> Result<Ve
     Ok(result)
 }
 
+pub async fn get_pods_for_resource(
+    client: Client,
+    resource_type: &str,
+    resource_name: &str,
+    namespace: &str,
+) -> Result<Vec<PodInfo>> {
+    use kube::api::ListParams;
+
+    // Determine the label selector based on resource type
+    let label_selector = match resource_type.to_lowercase().as_str() {
+        "deployment" => {
+            // For deployments, we need to get the deployment's selector
+            let deployments: Api<Deployment> = Api::namespaced(client.clone(), namespace);
+            let deployment = deployments.get(resource_name).await?;
+
+            // Extract label selector from deployment spec
+            if let Some(spec) = deployment.spec {
+                if let Some(selector) = spec.selector.match_labels {
+                    // Convert labels to selector string
+                    selector
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                } else {
+                    return Ok(Vec::new());
+                }
+            } else {
+                return Ok(Vec::new());
+            }
+        }
+        "statefulset" => {
+            let statefulsets: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
+            let statefulset = statefulsets.get(resource_name).await?;
+
+            if let Some(spec) = statefulset.spec {
+                if let Some(selector) = spec.selector.match_labels {
+                    selector
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                } else {
+                    return Ok(Vec::new());
+                }
+            } else {
+                return Ok(Vec::new());
+            }
+        }
+        "daemonset" => {
+            let daemonsets: Api<DaemonSet> = Api::namespaced(client.clone(), namespace);
+            let daemonset = daemonsets.get(resource_name).await?;
+
+            if let Some(spec) = daemonset.spec {
+                if let Some(selector) = spec.selector.match_labels {
+                    selector
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                } else {
+                    return Ok(Vec::new());
+                }
+            } else {
+                return Ok(Vec::new());
+            }
+        }
+        "job" => {
+            // For jobs, use job-name label
+            format!("job-name={}", resource_name)
+        }
+        _ => return Err(anyhow::anyhow!("Unsupported resource type: {}", resource_type)),
+    };
+
+    // Query pods with the label selector
+    let pods: Api<Pod> = Api::namespaced(client, namespace);
+    let lp = ListParams::default().labels(&label_selector);
+    let pod_list = pods.list(&lp).await?;
+
+    // Convert to PodInfo (reuse the existing logic from list_pods)
+    let mut result = Vec::new();
+    for pod in pod_list {
+        let name = pod.metadata.name.unwrap_or_default();
+        let namespace = pod.metadata.namespace.unwrap_or_default();
+
+        let status = pod
+            .status
+            .as_ref()
+            .and_then(|s| s.phase.as_ref())
+            .map(|p| p.to_string())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let container_statuses = pod
+            .status
+            .as_ref()
+            .and_then(|s| s.container_statuses.as_ref());
+
+        let ready_containers = container_statuses
+            .map(|cs| cs.iter().filter(|c| c.ready).count())
+            .unwrap_or(0);
+
+        let total_containers = container_statuses.map(|cs| cs.len()).unwrap_or(0);
+
+        let ready = format!("{}/{}", ready_containers, total_containers);
+
+        let restarts = container_statuses
+            .map(|cs| cs.iter().map(|c| c.restart_count).sum())
+            .unwrap_or(0);
+
+        let age = pod
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let node = pod.spec.as_ref().and_then(|s| s.node_name.clone());
+        let ip = pod.status.as_ref().and_then(|s| s.pod_ip.clone());
+
+        let ports: Vec<i32> = pod
+            .spec
+            .as_ref()
+            .map(|s| {
+                s.containers
+                    .iter()
+                    .flat_map(|c| {
+                        c.ports.as_ref().map(|ports| {
+                            ports.iter().map(|p| p.container_port).collect::<Vec<_>>()
+                        }).unwrap_or_default()
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        result.push(PodInfo {
+            name,
+            namespace,
+            status,
+            ready,
+            restarts,
+            age,
+            node,
+            ip,
+            ports,
+        });
+    }
+
+    Ok(result)
+}
+
 // Apply YAML to update a resource
 pub async fn apply_resource_yaml(
     client: Client,

@@ -679,6 +679,19 @@ pub async fn delete_cronjob(
         .await.map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn get_pods_for_resource(
+    resource_type: String,
+    resource_name: String,
+    namespace: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<PodInfo>, String> {
+    let client = client_manager.get_client().await.map_err(|e| e.to_string())?;
+    crate::kube::get_pods_for_resource(client, &resource_type, &resource_name, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // Port Forward Commands
 #[tauri::command]
 pub async fn start_port_forward(

@@ -64,6 +64,7 @@ pub fn run() {
             commands::suspend_cronjob,
             commands::resume_cronjob,
             commands::delete_cronjob,
+            commands::get_pods_for_resource,
             commands::start_port_forward,
             commands::stop_port_forward,
             commands::list_port_forwards,

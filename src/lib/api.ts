@@ -288,6 +288,18 @@ export const api = {
     });
   },
 
+  async getPodsForResource(
+    resourceType: string,
+    resourceName: string,
+    namespace: string
+  ): Promise<PodInfo[]> {
+    return await invoke("get_pods_for_resource", {
+      resourceType,
+      resourceName,
+      namespace,
+    });
+  },
+
   // Node operations
   async getNodes(): Promise<NodeInfo[]> {
     return await invoke("get_nodes");
