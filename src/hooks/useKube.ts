@@ -29,7 +29,7 @@ export function usePods(namespace: string) {
   return useQuery({
     queryKey: ["pods", namespace],
     queryFn: () => api.getPods(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
   });
 }
@@ -38,7 +38,7 @@ export function useDeployments(namespace: string) {
   return useQuery({
     queryKey: ["deployments", namespace],
     queryFn: () => api.getDeployments(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 5000,
   });
 }
@@ -47,7 +47,7 @@ export function useServices(namespace: string) {
   return useQuery({
     queryKey: ["services", namespace],
     queryFn: () => api.getServices(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 10000,
   });
 }
@@ -84,7 +84,7 @@ export function usePodLogs(
   return useQuery({
     queryKey: ["logs", namespace, podName, container, tailLines],
     queryFn: () => api.getPodLogs(namespace, podName, container, tailLines),
-    enabled: !!namespace && !!podName,
+    enabled: namespace !== undefined && !!podName,
     refetchInterval: 2000, // Refetch logs every 2 seconds
   });
 }
@@ -168,7 +168,7 @@ export function useIngresses(namespace: string) {
   return useQuery({
     queryKey: ["ingresses", namespace],
     queryFn: () => api.getIngresses(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 10000,
   });
 }
@@ -177,7 +177,7 @@ export function useIstioVirtualServices(namespace: string) {
   return useQuery({
     queryKey: ["istio-vs", namespace],
     queryFn: () => api.getIstioVirtualServices(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 10000,
   });
 }
@@ -186,7 +186,7 @@ export function useIstioGateways(namespace: string) {
   return useQuery({
     queryKey: ["istio-gateways", namespace],
     queryFn: () => api.getIstioGateways(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 10000,
   });
 }
@@ -195,7 +195,7 @@ export function useConfigMaps(namespace: string) {
   return useQuery({
     queryKey: ["configmaps", namespace],
     queryFn: () => api.getConfigMaps(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 10000,
   });
 }
@@ -227,7 +227,7 @@ export function useSecrets(namespace: string) {
   return useQuery({
     queryKey: ["secrets", namespace],
     queryFn: () => api.getSecrets(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 10000,
   });
 }
@@ -259,7 +259,7 @@ export function useStatefulSets(namespace: string) {
   return useQuery({
     queryKey: ["statefulsets", namespace],
     queryFn: () => api.getStatefulSets(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 5000,
   });
 }
@@ -338,7 +338,7 @@ export function useDaemonSets(namespace: string) {
   return useQuery({
     queryKey: ["daemonsets", namespace],
     queryFn: () => api.getDaemonSets(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 5000,
   });
 }
@@ -399,7 +399,7 @@ export function useJobs(namespace: string) {
   return useQuery({
     queryKey: ["jobs", namespace],
     queryFn: () => api.getJobs(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 5000,
   });
 }
@@ -435,7 +435,7 @@ export function useCronJobs(namespace: string) {
   return useQuery({
     queryKey: ["cronjobs", namespace],
     queryFn: () => api.getCronJobs(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 10000,
   });
 }
@@ -533,7 +533,7 @@ export function useEvents(namespace: string) {
   return useQuery({
     queryKey: ["events", namespace],
     queryFn: () => api.getEvents(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 5000, // Events change frequently
   });
 }
@@ -550,7 +550,7 @@ export function usePersistentVolumeClaims(namespace: string) {
   return useQuery({
     queryKey: ["persistent-volume-claims", namespace],
     queryFn: () => api.getPersistentVolumeClaims(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 10000,
   });
 }
@@ -560,7 +560,7 @@ export function useRoles(namespace: string) {
   return useQuery({
     queryKey: ["roles", namespace],
     queryFn: () => api.getRoles(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 10000,
   });
 }
@@ -569,7 +569,7 @@ export function useRoleBindings(namespace: string) {
   return useQuery({
     queryKey: ["role-bindings", namespace],
     queryFn: () => api.getRoleBindings(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 10000,
   });
 }
@@ -594,7 +594,7 @@ export function useServiceAccounts(namespace: string) {
   return useQuery({
     queryKey: ["service-accounts", namespace],
     queryFn: () => api.getServiceAccounts(namespace),
-    enabled: !!namespace,
+    enabled: namespace !== undefined,
     refetchInterval: 10000,
   });
 }
