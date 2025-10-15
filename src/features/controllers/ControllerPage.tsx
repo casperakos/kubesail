@@ -29,6 +29,7 @@ import { useAppStore } from "../../lib/store";
 import { useController } from "../../hooks/useControllerDetection";
 import { CustomResourceDescribeViewer } from "../../components/CustomResourceDescribeViewer";
 import { CustomResourceYamlViewer } from "../../components/CustomResourceYamlViewer";
+import { WorkflowDAGViewer } from "../../components/WorkflowDAGViewer";
 
 interface CRD {
   name: string;
@@ -460,6 +461,7 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
   const [describeResource, setDescribeResource] = useState<CustomResource | null>(null);
   const [yamlResource, setYamlResource] = useState<CustomResource | null>(null);
   const [detailsResource, setDetailsResource] = useState<CustomResource | null>(null);
+  const [workflowViewMode, setWorkflowViewMode] = useState<"details" | "dag">("details");
 
   // For tracking syncing operations
   const [syncingResources, setSyncingResources] = useState<Set<string>>(new Set());
@@ -1313,24 +1315,54 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
         {/* Details Modal for Workflows */}
         {detailsResource && controllerId === "argo-workflows" && detailsResource.kind === "Workflow" && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-background rounded-xl border border-border shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-border">
-                <div>
-                  <h3 className="text-xl font-bold">{detailsResource.name}</h3>
-                  <p className="text-sm text-muted-foreground mt-1">Workflow Details</p>
+            <div className="bg-background rounded-xl border border-border shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+              {/* Header with tabs */}
+              <div className="border-b border-border">
+                <div className="flex items-center justify-between px-6 pt-4">
+                  <div>
+                    <h3 className="text-xl font-bold">{detailsResource.name}</h3>
+                    <p className="text-sm text-muted-foreground mt-1">Workflow</p>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      setDetailsResource(null);
+                      setWorkflowViewMode("details");
+                    }}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
                 </div>
-                <Button
-                  onClick={() => setDetailsResource(null)}
-                  variant="ghost"
-                  size="sm"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
+
+                {/* Tabs */}
+                <div className="flex gap-1 px-6 pt-4">
+                  <button
+                    onClick={() => setWorkflowViewMode("details")}
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                      workflowViewMode === "details"
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Details
+                  </button>
+                  <button
+                    onClick={() => setWorkflowViewMode("dag")}
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                      workflowViewMode === "dag"
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Workflow DAG
+                  </button>
+                </div>
               </div>
 
               {/* Content */}
-              <div className="flex-1 overflow-auto p-6 space-y-6">
+              {workflowViewMode === "details" ? (
+                <div className="flex-1 overflow-auto p-6 space-y-6">
                 {/* Status Information */}
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Execution Status</h4>
@@ -1439,11 +1471,19 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
                     </div>
                   </div>
                 )}
-              </div>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-hidden">
+                  <WorkflowDAGViewer nodes={detailsResource.metadata?.status?.nodes || {}} />
+                </div>
+              )}
 
               {/* Footer */}
               <div className="flex items-center justify-end gap-2 p-6 border-t border-border">
-                <Button onClick={() => setDetailsResource(null)} variant="outline">
+                <Button onClick={() => {
+                  setDetailsResource(null);
+                  setWorkflowViewMode("details");
+                }} variant="outline">
                   Close
                 </Button>
               </div>
