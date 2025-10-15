@@ -34,7 +34,7 @@ export function RBACList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const [activeTab, setActiveTab] = useState<RBACType>("roles");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedResource, setSelectedResource] = useState<string | null>(null);
+  const [selectedResource, setSelectedResource] = useState<{name: string; namespace?: string} | null>(null);
 
   const { data: roles, isLoading: rolesLoading, error: rolesError, refetch: rolesRefetch } =
     useRoles(currentNamespace);
@@ -260,8 +260,8 @@ export function RBACList() {
       {selectedResource && (
         <YamlViewer
           resourceType={getResourceType()}
-          resourceName={selectedResource}
-          namespace={isClusterScoped ? undefined : currentNamespace}
+          resourceName={selectedResource.name}
+          namespace={selectedResource.namespace}
           onClose={() => setSelectedResource(null)}
         />
       )}
@@ -322,7 +322,7 @@ function RolesTable({ data, isLoading, error, searchQuery, onViewYaml }: { data:
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => onViewYaml(role.name)}
+                  onClick={() => onViewYaml({name: role.name, namespace: role.namespace})}
                 >
                   <FileText className="w-4 h-4" />
                 </Button>
@@ -401,7 +401,7 @@ function RoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => onViewYaml(rb.name)}
+                  onClick={() => onViewYaml({name: rb.name, namespace: rb.namespace})}
                 >
                   <FileText className="w-4 h-4" />
                 </Button>
@@ -460,7 +460,7 @@ function ClusterRolesTable({ data, isLoading, error, searchQuery, onViewYaml }: 
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => onViewYaml(cr.name)}
+                  onClick={() => onViewYaml({name: cr.name})}
                 >
                   <FileText className="w-4 h-4" />
                 </Button>
@@ -529,7 +529,7 @@ function ClusterRoleBindingsTable({ data, isLoading, error, searchQuery, onViewY
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => onViewYaml(crb.name)}
+                  onClick={() => onViewYaml({name: crb.name})}
                 >
                   <FileText className="w-4 h-4" />
                 </Button>
@@ -595,7 +595,7 @@ function ServiceAccountsTable({ data, isLoading, error, searchQuery, onViewYaml 
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => onViewYaml(sa.name)}
+                  onClick={() => onViewYaml({name: sa.name, namespace: sa.namespace})}
                 >
                   <FileText className="w-4 h-4" />
                 </Button>

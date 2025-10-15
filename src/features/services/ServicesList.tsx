@@ -21,7 +21,7 @@ export function ServicesList() {
   const { data: services, isLoading, error, refetch } = useServices(currentNamespace);
   const deleteService = useDeleteService();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedResource, setSelectedResource] = useState<string | null>(null);
+  const [selectedResource, setSelectedResource] = useState<{name: string; namespace: string} | null>(null);
   const [selectedServiceForPortForward, setSelectedServiceForPortForward] = useState<string | null>(null);
   const [serviceToDelete, setServiceToDelete] = useState<string | null>(null);
 
@@ -31,10 +31,13 @@ export function ServicesList() {
 
   const confirmDelete = () => {
     if (serviceToDelete) {
-      deleteService.mutate({
-        namespace: currentNamespace,
-        serviceName: serviceToDelete,
-      });
+      const service = services?.find(s => s.name === serviceToDelete);
+      if (service) {
+        deleteService.mutate({
+          namespace: service.namespace,
+          serviceName: serviceToDelete,
+        });
+      }
       setServiceToDelete(null);
     }
   };
@@ -220,7 +223,7 @@ export function ServicesList() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setSelectedResource(service.name)}
+                    onClick={() => setSelectedResource({name: service.name, namespace: service.namespace})}
                     title="View YAML"
                   >
                     <FileText className="w-4 h-4" />
@@ -245,8 +248,8 @@ export function ServicesList() {
       {selectedResource && (
         <YamlViewer
           resourceType="service"
-          resourceName={selectedResource}
-          namespace={currentNamespace}
+          resourceName={selectedResource.name}
+          namespace={selectedResource.namespace}
           onClose={() => setSelectedResource(null)}
         />
       )}

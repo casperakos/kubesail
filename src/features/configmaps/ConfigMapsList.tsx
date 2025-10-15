@@ -22,7 +22,7 @@ export function ConfigMapsList() {
   const deleteConfigMap = useDeleteConfigMap();
   const [selectedConfigMap, setSelectedConfigMap] = useState<ConfigMapInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedResource, setSelectedResource] = useState<string | null>(null);
+  const [selectedResource, setSelectedResource] = useState<{name: string; namespace: string} | null>(null);
   const [configmapToDelete, setConfigmapToDelete] = useState<string | null>(null);
 
   const handleDelete = (configmapName: string) => {
@@ -31,10 +31,13 @@ export function ConfigMapsList() {
 
   const confirmDelete = () => {
     if (configmapToDelete) {
-      deleteConfigMap.mutate({
-        namespace: currentNamespace,
-        configmapName: configmapToDelete,
-      });
+      const configmap = configmaps?.find(cm => cm.name === configmapToDelete);
+      if (configmap) {
+        deleteConfigMap.mutate({
+          namespace: configmap.namespace,
+          configmapName: configmapToDelete,
+        });
+      }
       setConfigmapToDelete(null);
     }
   };
@@ -154,7 +157,7 @@ export function ConfigMapsList() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setSelectedResource(cm.name)}
+                    onClick={() => setSelectedResource({name: cm.name, namespace: cm.namespace})}
                     title="View YAML"
                   >
                     <FileText className="w-4 h-4" />
@@ -187,8 +190,8 @@ export function ConfigMapsList() {
       {selectedResource && (
         <YamlViewer
           resourceType="configmap"
-          resourceName={selectedResource}
-          namespace={currentNamespace}
+          resourceName={selectedResource.name}
+          namespace={selectedResource.namespace}
           onClose={() => setSelectedResource(null)}
         />
       )}

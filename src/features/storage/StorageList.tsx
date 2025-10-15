@@ -23,7 +23,7 @@ export function StorageList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const [activeTab, setActiveTab] = useState<StorageType>("pvc");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedResource, setSelectedResource] = useState<string | null>(null);
+  const [selectedResource, setSelectedResource] = useState<{name: string; namespace?: string} | null>(null);
 
   const { data: pvs, isLoading: pvLoading, error: pvError, refetch: pvRefetch } =
     usePersistentVolumes();
@@ -157,8 +157,8 @@ export function StorageList() {
       {selectedResource && (
         <YamlViewer
           resourceType={getResourceType()}
-          resourceName={selectedResource}
-          namespace={activeTab === "pvc" ? currentNamespace : undefined}
+          resourceName={selectedResource.name}
+          namespace={selectedResource.namespace}
           onClose={() => setSelectedResource(null)}
         />
       )}
@@ -251,7 +251,7 @@ function PersistentVolumesTable({ data, isLoading, error, searchQuery, onViewYam
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onViewYaml(pv.name)}
+                onClick={() => onViewYaml({name: pv.name})}
               >
                 <FileText className="w-4 h-4" />
               </Button>
@@ -350,7 +350,7 @@ function PersistentVolumeClaimsTable({ data, isLoading, error, searchQuery, onVi
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onViewYaml(pvc.name)}
+                onClick={() => onViewYaml({name: pvc.name, namespace: pvc.namespace})}
               >
                 <FileText className="w-4 h-4" />
               </Button>

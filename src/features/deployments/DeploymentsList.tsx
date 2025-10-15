@@ -26,7 +26,7 @@ export function DeploymentsList() {
   const [scalingDeployment, setScalingDeployment] = useState<string | null>(null);
   const [restartingDeployment, setRestartingDeployment] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDeployment, setSelectedDeployment] = useState<string | null>(null);
+  const [selectedDeployment, setSelectedDeployment] = useState<{name: string; namespace: string} | null>(null);
   const [deploymentToDelete, setDeploymentToDelete] = useState<string | null>(null);
   const [deploymentToScale, setDeploymentToScale] = useState<{
     name: string;
@@ -52,17 +52,20 @@ export function DeploymentsList() {
     if (deploymentToScale) {
       const replicas = parseInt(newReplicaCount, 10);
       if (!isNaN(replicas) && replicas >= 0) {
-        setScalingDeployment(deploymentToScale.name);
-        scaleDeployment.mutate(
-          {
-            namespace: currentNamespace,
-            deploymentName: deploymentToScale.name,
-            replicas,
-          },
-          {
-            onSettled: () => setScalingDeployment(null),
-          }
-        );
+        const deployment = deployments?.find(d => d.name === deploymentToScale.name);
+        if (deployment) {
+          setScalingDeployment(deploymentToScale.name);
+          scaleDeployment.mutate(
+            {
+              namespace: deployment.namespace,
+              deploymentName: deploymentToScale.name,
+              replicas,
+            },
+            {
+              onSettled: () => setScalingDeployment(null),
+            }
+          );
+        }
         setDeploymentToScale(null);
         setNewReplicaCount("");
       }
@@ -80,14 +83,17 @@ export function DeploymentsList() {
 
   const confirmRestart = async () => {
     if (deploymentToRestart) {
-      setRestartingDeployment(deploymentToRestart);
-      try {
-        await restartDeploymentMutation.mutateAsync({
-          namespace: currentNamespace,
-          deploymentName: deploymentToRestart,
-        });
-      } finally {
-        setRestartingDeployment(null);
+      const deployment = deployments?.find(d => d.name === deploymentToRestart);
+      if (deployment) {
+        setRestartingDeployment(deploymentToRestart);
+        try {
+          await restartDeploymentMutation.mutateAsync({
+            namespace: deployment.namespace,
+            deploymentName: deploymentToRestart,
+          });
+        } finally {
+          setRestartingDeployment(null);
+        }
       }
       setDeploymentToRestart(null);
     }
@@ -103,10 +109,13 @@ export function DeploymentsList() {
 
   const confirmDelete = () => {
     if (deploymentToDelete) {
-      deleteDeployment.mutate({
-        namespace: currentNamespace,
-        deploymentName: deploymentToDelete,
-      });
+      const deployment = deployments?.find(d => d.name === deploymentToDelete);
+      if (deployment) {
+        deleteDeployment.mutate({
+          namespace: deployment.namespace,
+          deploymentName: deploymentToDelete,
+        });
+      }
       setDeploymentToDelete(null);
     }
   };
@@ -260,7 +269,7 @@ export function DeploymentsList() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setSelectedDeployment(deployment.name)}
+                      onClick={() => setSelectedDeployment({name: deployment.name, namespace: deployment.namespace})}
                       title="View YAML"
                     >
                       <FileText className="w-4 h-4" />
@@ -303,8 +312,8 @@ export function DeploymentsList() {
       {selectedDeployment && (
         <YamlViewer
           resourceType="deployment"
-          resourceName={selectedDeployment}
-          namespace={currentNamespace}
+          resourceName={selectedDeployment.name}
+          namespace={selectedDeployment.namespace}
           onClose={() => setSelectedDeployment(null)}
         />
       )}

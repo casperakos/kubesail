@@ -22,7 +22,7 @@ export function SecretsList() {
   const deleteSecret = useDeleteSecret();
   const [selectedSecret, setSelectedSecret] = useState<SecretInfo | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedResource, setSelectedResource] = useState<string | null>(null);
+  const [selectedResource, setSelectedResource] = useState<{name: string; namespace: string} | null>(null);
   const [secretToDelete, setSecretToDelete] = useState<string | null>(null);
 
   const handleDelete = (secretName: string) => {
@@ -31,10 +31,13 @@ export function SecretsList() {
 
   const confirmDelete = () => {
     if (secretToDelete) {
-      deleteSecret.mutate({
-        namespace: currentNamespace,
-        secretName: secretToDelete,
-      });
+      const secret = secrets?.find(s => s.name === secretToDelete);
+      if (secret) {
+        deleteSecret.mutate({
+          namespace: secret.namespace,
+          secretName: secretToDelete,
+        });
+      }
       setSecretToDelete(null);
     }
   };
@@ -167,7 +170,7 @@ export function SecretsList() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setSelectedResource(secret.name)}
+                    onClick={() => setSelectedResource({name: secret.name, namespace: secret.namespace})}
                     title="View YAML"
                   >
                     <FileText className="w-4 h-4" />
@@ -200,8 +203,8 @@ export function SecretsList() {
       {selectedResource && (
         <YamlViewer
           resourceType="secret"
-          resourceName={selectedResource}
-          namespace={currentNamespace}
+          resourceName={selectedResource.name}
+          namespace={selectedResource.namespace}
           onClose={() => setSelectedResource(null)}
         />
       )}

@@ -21,10 +21,10 @@ export function PodsList() {
   const showNamespaceColumn = !currentNamespace;
   const { data: pods, isLoading, error, refetch } = usePods(currentNamespace);
   const deletePod = useDeletePod();
-  const [selectedPodForLogs, setSelectedPodForLogs] = useState<string | null>(
+  const [selectedPodForLogs, setSelectedPodForLogs] = useState<{name: string; namespace: string} | null>(
     null
   );
-  const [selectedPodForYaml, setSelectedPodForYaml] = useState<string | null>(
+  const [selectedPodForYaml, setSelectedPodForYaml] = useState<{name: string; namespace: string} | null>(
     null
   );
   const [selectedPodForPortForward, setSelectedPodForPortForward] = useState<{
@@ -58,7 +58,10 @@ export function PodsList() {
   const confirmDelete = () => {
     if (podToDelete) {
       console.log("Confirmed deletion, calling mutate");
-      deletePod.mutate({ namespace: currentNamespace, podName: podToDelete });
+      const pod = pods?.find(p => p.name === podToDelete);
+      if (pod) {
+        deletePod.mutate({ namespace: pod.namespace, podName: podToDelete });
+      }
       setPodToDelete(null);
     }
   };
@@ -97,7 +100,10 @@ export function PodsList() {
   const confirmBulkDelete = async () => {
     console.log("Confirmed bulk deletion for:", Array.from(selectedPods));
     for (const podName of selectedPods) {
-      deletePod.mutate({ namespace: currentNamespace, podName });
+      const pod = pods?.find(p => p.name === podName);
+      if (pod) {
+        deletePod.mutate({ namespace: pod.namespace, podName });
+      }
     }
     setSelectedPods(new Set());
     setShowBulkDeleteConfirm(false);
@@ -309,7 +315,7 @@ export function PodsList() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setSelectedPodForYaml(pod.name)}
+                    onClick={() => setSelectedPodForYaml({name: pod.name, namespace: pod.namespace})}
                     title="View YAML"
                   >
                     <Code className="w-4 h-4" />
@@ -317,7 +323,7 @@ export function PodsList() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setSelectedPodForLogs(pod.name)}
+                    onClick={() => setSelectedPodForLogs({name: pod.name, namespace: pod.namespace})}
                     title="View logs"
                   >
                     <FileText className="w-4 h-4" />
@@ -341,8 +347,8 @@ export function PodsList() {
 
       {selectedPodForLogs && (
         <LogsViewer
-          namespace={currentNamespace}
-          podName={selectedPodForLogs}
+          namespace={selectedPodForLogs.namespace}
+          podName={selectedPodForLogs.name}
           onClose={() => setSelectedPodForLogs(null)}
         />
       )}
@@ -350,8 +356,8 @@ export function PodsList() {
       {selectedPodForYaml && (
         <YamlViewer
           resourceType="pod"
-          resourceName={selectedPodForYaml}
-          namespace={currentNamespace}
+          resourceName={selectedPodForYaml.name}
+          namespace={selectedPodForYaml.namespace}
           onClose={() => setSelectedPodForYaml(null)}
         />
       )}

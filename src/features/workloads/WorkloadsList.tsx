@@ -36,7 +36,7 @@ export function WorkloadsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const [activeTab, setActiveTab] = useState<WorkloadType>("statefulsets");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedResource, setSelectedResource] = useState<string | null>(null);
+  const [selectedResource, setSelectedResource] = useState<{name: string; namespace: string} | null>(null);
 
   const { data: statefulsets, isLoading: stsLoading, error: stsError, refetch: stsRefetch } =
     useStatefulSets(currentNamespace);
@@ -221,8 +221,8 @@ export function WorkloadsList() {
       {selectedResource && (
         <YamlViewer
           resourceType={getResourceType()}
-          resourceName={selectedResource}
-          namespace={currentNamespace}
+          resourceName={selectedResource.name}
+          namespace={selectedResource.namespace}
           onClose={() => setSelectedResource(null)}
         />
       )}
@@ -231,6 +231,7 @@ export function WorkloadsList() {
 }
 
 function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
+  const deployments = data;
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const showNamespaceColumn = !currentNamespace;
   const scaleStatefulSet = useScaleStatefulSet();
@@ -264,17 +265,20 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
     if (statefulsetToScale) {
       const replicas = parseInt(newReplicaCount, 10);
       if (!isNaN(replicas) && replicas >= 0) {
-        setScalingStatefulSet(statefulsetToScale.name);
-        scaleStatefulSet.mutate(
-          {
-            namespace: currentNamespace,
-            statefulsetName: statefulsetToScale.name,
-            replicas,
-          },
-          {
-            onSettled: () => setScalingStatefulSet(null),
-          }
-        );
+        const statefulset = deployments?.find((s: any) => s.name === statefulsetToScale.name);
+        if (statefulset) {
+          setScalingStatefulSet(statefulsetToScale.name);
+          scaleStatefulSet.mutate(
+            {
+              namespace: statefulset.namespace,
+              statefulsetName: statefulsetToScale.name,
+              replicas,
+            },
+            {
+              onSettled: () => setScalingStatefulSet(null),
+            }
+          );
+        }
         setStatefulsetToScale(null);
         setNewReplicaCount("");
       }
@@ -292,14 +296,17 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
 
   const confirmRestartStatefulSet = async () => {
     if (statefulsetToRestart) {
-      setRestartingStatefulSet(statefulsetToRestart);
-      try {
-        await restartStatefulSetMutation.mutateAsync({
-          namespace: currentNamespace,
-          statefulsetName: statefulsetToRestart,
-        });
-      } finally {
-        setRestartingStatefulSet(null);
+      const statefulset = deployments?.find((s: any) => s.name === statefulsetToRestart);
+      if (statefulset) {
+        setRestartingStatefulSet(statefulsetToRestart);
+        try {
+          await restartStatefulSetMutation.mutateAsync({
+            namespace: statefulset.namespace,
+            statefulsetName: statefulsetToRestart,
+          });
+        } finally {
+          setRestartingStatefulSet(null);
+        }
       }
       setStatefulsetToRestart(null);
     }
@@ -315,10 +322,13 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
 
   const confirmDeleteStatefulSet = () => {
     if (statefulsetToDelete) {
-      deleteStatefulSet.mutate({
-        namespace: currentNamespace,
-        statefulsetName: statefulsetToDelete,
-      });
+      const statefulset = deployments?.find((s: any) => s.name === statefulsetToDelete);
+      if (statefulset) {
+        deleteStatefulSet.mutate({
+          namespace: statefulset.namespace,
+          statefulsetName: statefulsetToDelete,
+        });
+      }
       setStatefulsetToDelete(null);
     }
   };
@@ -388,7 +398,7 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => onViewYaml(sts.name)}
+                    onClick={() => onViewYaml({name: sts.name, namespace: sts.namespace})}
                     title="View YAML"
                   >
                     <FileText className="w-4 h-4" />
@@ -515,6 +525,7 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
 }
 
 function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
+  const daemonsets = data;
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const showNamespaceColumn = !currentNamespace;
   const deleteDaemonSet = useDeleteDaemonSet();
@@ -538,14 +549,17 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
 
   const confirmRestartDaemonSet = async () => {
     if (daemonsetToRestart) {
-      setRestartingDaemonSet(daemonsetToRestart);
-      try {
-        await restartDaemonSetMutation.mutateAsync({
-          namespace: currentNamespace,
-          daemonsetName: daemonsetToRestart,
-        });
-      } finally {
-        setRestartingDaemonSet(null);
+      const daemonset = daemonsets?.find((ds: any) => ds.name === daemonsetToRestart);
+      if (daemonset) {
+        setRestartingDaemonSet(daemonsetToRestart);
+        try {
+          await restartDaemonSetMutation.mutateAsync({
+            namespace: daemonset.namespace,
+            daemonsetName: daemonsetToRestart,
+          });
+        } finally {
+          setRestartingDaemonSet(null);
+        }
       }
       setDaemonsetToRestart(null);
     }
@@ -561,10 +575,13 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
 
   const confirmDeleteDaemonSet = () => {
     if (daemonsetToDelete) {
-      deleteDaemonSet.mutate({
-        namespace: currentNamespace,
-        daemonsetName: daemonsetToDelete,
-      });
+      const daemonset = daemonsets?.find((ds: any) => ds.name === daemonsetToDelete);
+      if (daemonset) {
+        deleteDaemonSet.mutate({
+          namespace: daemonset.namespace,
+          daemonsetName: daemonsetToDelete,
+        });
+      }
       setDaemonsetToDelete(null);
     }
   };
@@ -634,7 +651,7 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => onViewYaml(ds.name)}
+                    onClick={() => onViewYaml({name: ds.name, namespace: ds.namespace})}
                     title="View YAML"
                   >
                     <FileText className="w-4 h-4" />
@@ -716,6 +733,7 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
 }
 
 function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
+  const jobs = data;
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const showNamespaceColumn = !currentNamespace;
   const deleteJob = useDeleteJob();
@@ -727,10 +745,13 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
 
   const confirmDeleteJob = () => {
     if (jobToDelete) {
-      deleteJob.mutate({
-        namespace: currentNamespace,
-        jobName: jobToDelete,
-      });
+      const job = jobs?.find((j: any) => j.name === jobToDelete);
+      if (job) {
+        deleteJob.mutate({
+          namespace: job.namespace,
+          jobName: jobToDelete,
+        });
+      }
       setJobToDelete(null);
     }
   };
@@ -806,7 +827,7 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => onViewYaml(job.name)}
+                    onClick={() => onViewYaml({name: job.name, namespace: job.namespace})}
                     title="View YAML"
                   >
                     <FileText className="w-4 h-4" />
@@ -856,6 +877,7 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
 }
 
 function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
+  const cronjobs = data;
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const showNamespaceColumn = !currentNamespace;
   const suspendCronJob = useSuspendCronJob();
@@ -873,14 +895,17 @@ function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any)
 
   const confirmSuspendCronJob = async () => {
     if (cronjobToSuspend) {
-      setSuspendingCronJob(cronjobToSuspend);
-      try {
-        await suspendCronJob.mutateAsync({
-          namespace: currentNamespace,
-          cronjobName: cronjobToSuspend,
-        });
-      } finally {
-        setSuspendingCronJob(null);
+      const cronjob = cronjobs?.find((cj: any) => cj.name === cronjobToSuspend);
+      if (cronjob) {
+        setSuspendingCronJob(cronjobToSuspend);
+        try {
+          await suspendCronJob.mutateAsync({
+            namespace: cronjob.namespace,
+            cronjobName: cronjobToSuspend,
+          });
+        } finally {
+          setSuspendingCronJob(null);
+        }
       }
       setCronjobToSuspend(null);
     }
@@ -896,14 +921,17 @@ function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any)
 
   const confirmResumeCronJob = async () => {
     if (cronjobToResume) {
-      setResumingCronJob(cronjobToResume);
-      try {
-        await resumeCronJob.mutateAsync({
-          namespace: currentNamespace,
-          cronjobName: cronjobToResume,
-        });
-      } finally {
-        setResumingCronJob(null);
+      const cronjob = cronjobs?.find((cj: any) => cj.name === cronjobToResume);
+      if (cronjob) {
+        setResumingCronJob(cronjobToResume);
+        try {
+          await resumeCronJob.mutateAsync({
+            namespace: cronjob.namespace,
+            cronjobName: cronjobToResume,
+          });
+        } finally {
+          setResumingCronJob(null);
+        }
       }
       setCronjobToResume(null);
     }
@@ -919,10 +947,13 @@ function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any)
 
   const confirmDeleteCronJob = () => {
     if (cronjobToDelete) {
-      deleteCronJob.mutate({
-        namespace: currentNamespace,
-        cronjobName: cronjobToDelete,
-      });
+      const cronjob = cronjobs?.find((cj: any) => cj.name === cronjobToDelete);
+      if (cronjob) {
+        deleteCronJob.mutate({
+          namespace: cronjob.namespace,
+          cronjobName: cronjobToDelete,
+        });
+      }
       setCronjobToDelete(null);
     }
   };
@@ -998,7 +1029,7 @@ function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any)
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => onViewYaml(cj.name)}
+                    onClick={() => onViewYaml({name: cj.name, namespace: cj.namespace})}
                     title="View YAML"
                   >
                     <FileText className="w-4 h-4" />

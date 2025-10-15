@@ -20,7 +20,7 @@ export function IngressesList() {
   const showNamespaceColumn = !currentNamespace;
   const { data: ingresses, isLoading, error, refetch } = useIngresses(currentNamespace);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedResource, setSelectedResource] = useState<string | null>(null);
+  const [selectedResource, setSelectedResource] = useState<{name: string; namespace: string} | null>(null);
 
   const getIngressClassVariant = (className?: string) => {
     if (!className) return "secondary";
@@ -221,7 +221,7 @@ export function IngressesList() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setSelectedResource(ingress.name)}
+                  onClick={() => setSelectedResource({name: ingress.name, namespace: ingress.namespace})}
                 >
                   <FileText className="w-4 h-4" />
                 </Button>
@@ -235,8 +235,8 @@ export function IngressesList() {
       {selectedResource && (
         <YamlViewer
           resourceType="ingress"
-          resourceName={selectedResource}
-          namespace={currentNamespace}
+          resourceName={selectedResource.name}
+          namespace={selectedResource.namespace}
           onClose={() => setSelectedResource(null)}
         />
       )}
