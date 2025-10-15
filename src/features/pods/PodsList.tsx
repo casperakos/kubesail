@@ -29,6 +29,7 @@ export function PodsList() {
   );
   const [selectedPodForPortForward, setSelectedPodForPortForward] = useState<{
     name: string;
+    namespace: string;
     ports: number[];
   } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -306,7 +307,7 @@ export function PodsList() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setSelectedPodForPortForward({ name: pod.name, ports: pod.ports })}
+                      onClick={() => setSelectedPodForPortForward({ name: pod.name, namespace: pod.namespace, ports: pod.ports })}
                       title={`Port Forward (${pod.ports.join(', ')})`}
                     >
                       <ArrowRightLeft className="w-4 h-4" />
@@ -366,7 +367,7 @@ export function PodsList() {
         <PortForwardModal
           resourceType="pod"
           resourceName={selectedPodForPortForward.name}
-          namespace={currentNamespace}
+          namespace={selectedPodForPortForward.namespace}
           availablePorts={selectedPodForPortForward.ports}
           onClose={() => setSelectedPodForPortForward(null)}
         />

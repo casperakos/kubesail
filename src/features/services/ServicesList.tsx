@@ -22,7 +22,7 @@ export function ServicesList() {
   const deleteService = useDeleteService();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedResource, setSelectedResource] = useState<{name: string; namespace: string} | null>(null);
-  const [selectedServiceForPortForward, setSelectedServiceForPortForward] = useState<string | null>(null);
+  const [selectedServiceForPortForward, setSelectedServiceForPortForward] = useState<{name: string; namespace: string} | null>(null);
   const [serviceToDelete, setServiceToDelete] = useState<string | null>(null);
 
   const handleDelete = (serviceName: string) => {
@@ -214,7 +214,7 @@ export function ServicesList() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => setSelectedServiceForPortForward(service.name)}
+                      onClick={() => setSelectedServiceForPortForward({name: service.name, namespace: service.namespace})}
                       title={`Port Forward (${service.ports})`}
                     >
                       <ArrowRightLeft className="w-4 h-4" />
@@ -257,8 +257,8 @@ export function ServicesList() {
       {selectedServiceForPortForward && (
         <PortForwardModal
           resourceType="service"
-          resourceName={selectedServiceForPortForward}
-          namespace={currentNamespace}
+          resourceName={selectedServiceForPortForward.name}
+          namespace={selectedServiceForPortForward.namespace}
           onClose={() => setSelectedServiceForPortForward(null)}
         />
       )}
