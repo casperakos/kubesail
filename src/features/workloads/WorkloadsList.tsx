@@ -232,6 +232,7 @@ export function WorkloadsList() {
 
 function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const showNamespaceColumn = !currentNamespace;
   const scaleStatefulSet = useScaleStatefulSet();
   const deleteStatefulSet = useDeleteStatefulSet();
   const queryClient = useQueryClient();
@@ -348,6 +349,7 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
+            {showNamespaceColumn && <TableHead>Namespace</TableHead>}
             <TableHead>Ready</TableHead>
             <TableHead>Replicas</TableHead>
             <TableHead>Age</TableHead>
@@ -367,6 +369,7 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
             data.map((sts: any) => (
             <TableRow key={sts.name}>
               <TableCell className="font-medium">{sts.name}</TableCell>
+              {showNamespaceColumn && <TableCell>{sts.namespace}</TableCell>}
               <TableCell>
                 <Badge
                   variant={
@@ -513,6 +516,7 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
 
 function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const showNamespaceColumn = !currentNamespace;
   const deleteDaemonSet = useDeleteDaemonSet();
   const queryClient = useQueryClient();
   const [restartingDaemonSet, setRestartingDaemonSet] = useState<string | null>(null);
@@ -591,6 +595,7 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
+            {showNamespaceColumn && <TableHead>Namespace</TableHead>}
             <TableHead>Desired</TableHead>
             <TableHead>Current</TableHead>
             <TableHead>Ready</TableHead>
@@ -613,6 +618,7 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
             data.map((ds: any) => (
             <TableRow key={ds.name}>
               <TableCell className="font-medium">{ds.name}</TableCell>
+              {showNamespaceColumn && <TableCell>{ds.namespace}</TableCell>}
               <TableCell>{ds.desired}</TableCell>
               <TableCell>{ds.current}</TableCell>
               <TableCell>
@@ -711,6 +717,7 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
 
 function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const showNamespaceColumn = !currentNamespace;
   const deleteJob = useDeleteJob();
   const [jobToDelete, setJobToDelete] = useState<string | null>(null);
 
@@ -752,6 +759,7 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
+            {showNamespaceColumn && <TableHead>Namespace</TableHead>}
             <TableHead>Completions</TableHead>
             <TableHead>Active</TableHead>
             <TableHead>Succeeded</TableHead>
@@ -774,6 +782,7 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
             data.map((job: any) => (
             <TableRow key={job.name}>
               <TableCell className="font-medium">{job.name}</TableCell>
+              {showNamespaceColumn && <TableCell>{job.namespace}</TableCell>}
               <TableCell>{job.completions}</TableCell>
               <TableCell>
                 {job.active > 0 && (
@@ -848,6 +857,7 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
 
 function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const showNamespaceColumn = !currentNamespace;
   const suspendCronJob = useSuspendCronJob();
   const resumeCronJob = useResumeCronJob();
   const deleteCronJob = useDeleteCronJob();
@@ -943,6 +953,7 @@ function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any)
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
+            {showNamespaceColumn && <TableHead>Namespace</TableHead>}
             <TableHead>Schedule</TableHead>
             <TableHead>Suspended</TableHead>
             <TableHead>Active</TableHead>
@@ -964,6 +975,7 @@ function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any)
             data.map((cj: any) => (
             <TableRow key={cj.name}>
               <TableCell className="font-medium">{cj.name}</TableCell>
+              {showNamespaceColumn && <TableCell>{cj.namespace}</TableCell>}
               <TableCell>
                 <code className="text-sm bg-muted px-2 py-1 rounded">
                   {cj.schedule}

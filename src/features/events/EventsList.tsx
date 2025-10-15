@@ -15,6 +15,7 @@ import { RefreshCw, Search, X } from "lucide-react";
 
 export function EventsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const showNamespaceColumn = !currentNamespace;
   const { data: events, isLoading, error, refetch } = useEvents(currentNamespace);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "Normal" | "Warning">("all");
@@ -135,6 +136,7 @@ export function EventsList() {
               <TableHead>Type</TableHead>
               <TableHead>Reason</TableHead>
               <TableHead>Object</TableHead>
+              {showNamespaceColumn && <TableHead>Namespace</TableHead>}
               <TableHead>Message</TableHead>
               <TableHead>Source</TableHead>
               <TableHead>Count</TableHead>
@@ -162,6 +164,7 @@ export function EventsList() {
                 </TableCell>
                 <TableCell className="font-medium">{event.reason}</TableCell>
                 <TableCell className="text-sm">{event.object}</TableCell>
+                {showNamespaceColumn && <TableCell>{event.namespace}</TableCell>}
                 <TableCell className="max-w-md">
                   <p className="text-sm text-muted-foreground truncate">
                     {event.message}

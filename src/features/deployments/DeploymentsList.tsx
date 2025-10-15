@@ -18,6 +18,7 @@ import { api } from "../../lib/api";
 
 export function DeploymentsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const showNamespaceColumn = !currentNamespace;
   const { data: deployments, isLoading, error, refetch } = useDeployments(currentNamespace);
   const scaleDeployment = useScaleDeployment();
   const deleteDeployment = useDeleteDeployment();
@@ -224,6 +225,7 @@ export function DeploymentsList() {
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
+            {showNamespaceColumn && <TableHead>Namespace</TableHead>}
             <TableHead>Ready</TableHead>
             <TableHead>Up-to-date</TableHead>
             <TableHead>Available</TableHead>
@@ -244,6 +246,7 @@ export function DeploymentsList() {
             return (
               <TableRow key={deployment.name}>
                 <TableCell className="font-medium">{deployment.name}</TableCell>
+                {showNamespaceColumn && <TableCell>{deployment.namespace}</TableCell>}
                 <TableCell>
                   <span className={ready === total ? "text-green-500" : "text-yellow-500"}>
                     {deployment.ready}

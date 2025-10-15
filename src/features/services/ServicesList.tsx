@@ -17,6 +17,7 @@ import { PortForwardModal } from "../../components/PortForwardModal";
 
 export function ServicesList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const showNamespaceColumn = !currentNamespace;
   const { data: services, isLoading, error, refetch } = useServices(currentNamespace);
   const deleteService = useDeleteService();
   const [searchQuery, setSearchQuery] = useState("");
@@ -168,12 +169,13 @@ export function ServicesList() {
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
+            {showNamespaceColumn && <TableHead>Namespace</TableHead>}
             <TableHead>Type</TableHead>
             <TableHead>Cluster IP</TableHead>
             <TableHead>External IP</TableHead>
             <TableHead>Ports</TableHead>
             <TableHead>Age</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -187,6 +189,7 @@ export function ServicesList() {
             filteredServices.map((service) => (
             <TableRow key={service.name}>
               <TableCell className="font-medium">{service.name}</TableCell>
+              {showNamespaceColumn && <TableCell>{service.namespace}</TableCell>}
               <TableCell>
                 <Badge variant={getTypeVariant(service.service_type)}>
                   {service.service_type}

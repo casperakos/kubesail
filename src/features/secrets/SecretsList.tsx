@@ -17,6 +17,7 @@ import { YamlViewer } from "../../components/YamlViewer";
 
 export function SecretsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const showNamespaceColumn = !currentNamespace;
   const { data: secrets, isLoading, error, refetch } = useSecrets(currentNamespace);
   const deleteSecret = useDeleteSecret();
   const [selectedSecret, setSelectedSecret] = useState<SecretInfo | null>(null);
@@ -133,6 +134,7 @@ export function SecretsList() {
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
+            {showNamespaceColumn && <TableHead>Namespace</TableHead>}
             <TableHead>Type</TableHead>
             <TableHead>Keys</TableHead>
             <TableHead>Age</TableHead>
@@ -150,6 +152,7 @@ export function SecretsList() {
             filteredSecrets.map((secret) => (
             <TableRow key={secret.name}>
               <TableCell className="font-medium">{secret.name}</TableCell>
+              {showNamespaceColumn && <TableCell>{secret.namespace}</TableCell>}
               <TableCell>
                 <Badge variant={getTypeVariant(secret.secret_type)}>
                   {secret.secret_type}

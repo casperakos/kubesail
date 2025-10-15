@@ -18,6 +18,7 @@ import { PortForwardModal } from "../../components/PortForwardModal";
 
 export function PodsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const showNamespaceColumn = !currentNamespace;
   const { data: pods, isLoading, error, refetch } = usePods(currentNamespace);
   const deletePod = useDeletePod();
   const [selectedPodForLogs, setSelectedPodForLogs] = useState<string | null>(
@@ -249,6 +250,7 @@ export function PodsList() {
               />
             </TableHead>
             <TableHead>Name</TableHead>
+            {showNamespaceColumn && <TableHead>Namespace</TableHead>}
             <TableHead>Status</TableHead>
             <TableHead>Ready</TableHead>
             <TableHead>Restarts</TableHead>
@@ -277,6 +279,7 @@ export function PodsList() {
                 />
               </TableCell>
               <TableCell className="font-medium">{pod.name}</TableCell>
+              {showNamespaceColumn && <TableCell>{pod.namespace}</TableCell>}
               <TableCell>
                 <Badge variant={getStatusVariant(pod.status)}>
                   {pod.status}

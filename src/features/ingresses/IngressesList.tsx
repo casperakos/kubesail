@@ -17,6 +17,7 @@ import { YamlViewer } from "../../components/YamlViewer";
 
 export function IngressesList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const showNamespaceColumn = !currentNamespace;
   const { data: ingresses, isLoading, error, refetch } = useIngresses(currentNamespace);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedResource, setSelectedResource] = useState<string | null>(null);
@@ -148,6 +149,7 @@ export function IngressesList() {
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
+            {showNamespaceColumn && <TableHead>Namespace</TableHead>}
             <TableHead>Class</TableHead>
             <TableHead>Hosts</TableHead>
             <TableHead>Addresses</TableHead>
@@ -167,6 +169,7 @@ export function IngressesList() {
             filteredIngresses.map((ingress: IngressInfo) => (
             <TableRow key={ingress.name}>
               <TableCell className="font-medium">{ingress.name}</TableCell>
+              {showNamespaceColumn && <TableCell>{ingress.namespace}</TableCell>}
               <TableCell>
                 {ingress.class ? (
                   <Badge variant={getIngressClassVariant(ingress.class)}>

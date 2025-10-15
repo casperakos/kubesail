@@ -17,6 +17,7 @@ import { YamlViewer } from "../../components/YamlViewer";
 
 export function ConfigMapsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const showNamespaceColumn = !currentNamespace;
   const { data: configmaps, isLoading, error, refetch } = useConfigMaps(currentNamespace);
   const deleteConfigMap = useDeleteConfigMap();
   const [selectedConfigMap, setSelectedConfigMap] = useState<ConfigMapInfo | null>(null);
@@ -126,6 +127,7 @@ export function ConfigMapsList() {
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
+            {showNamespaceColumn && <TableHead>Namespace</TableHead>}
             <TableHead>Keys</TableHead>
             <TableHead>Age</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -142,6 +144,7 @@ export function ConfigMapsList() {
             filteredConfigMaps.map((cm) => (
             <TableRow key={cm.name}>
               <TableCell className="font-medium">{cm.name}</TableCell>
+              {showNamespaceColumn && <TableCell>{cm.namespace}</TableCell>}
               <TableCell>
                 <Badge variant="secondary">{cm.keys} keys</Badge>
               </TableCell>

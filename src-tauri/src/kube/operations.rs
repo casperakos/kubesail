@@ -48,7 +48,11 @@ pub async fn list_namespaces(client: Client) -> Result<Vec<NamespaceInfo>> {
 }
 
 pub async fn list_pods(client: Client, namespace: &str) -> Result<Vec<PodInfo>> {
-    let pods: Api<Pod> = Api::namespaced(client, namespace);
+    let pods: Api<Pod> = if namespace.is_empty() {
+        Api::all(client)
+    } else {
+        Api::namespaced(client, namespace)
+    };
     let lp = ListParams::default();
     let pod_list = pods.list(&lp).await?;
 
@@ -126,7 +130,11 @@ pub async fn list_pods(client: Client, namespace: &str) -> Result<Vec<PodInfo>> 
 }
 
 pub async fn list_deployments(client: Client, namespace: &str) -> Result<Vec<DeploymentInfo>> {
-    let deployments: Api<Deployment> = Api::namespaced(client, namespace);
+    let deployments: Api<Deployment> = if namespace.is_empty() {
+        Api::all(client)
+    } else {
+        Api::namespaced(client, namespace)
+    };
     let lp = ListParams::default();
     let deployment_list = deployments.list(&lp).await?;
 
@@ -167,7 +175,11 @@ pub async fn list_deployments(client: Client, namespace: &str) -> Result<Vec<Dep
 }
 
 pub async fn list_services(client: Client, namespace: &str) -> Result<Vec<ServiceInfo>> {
-    let services: Api<Service> = Api::namespaced(client, namespace);
+    let services: Api<Service> = if namespace.is_empty() {
+        Api::all(client)
+    } else {
+        Api::namespaced(client, namespace)
+    };
     let lp = ListParams::default();
     let service_list = services.list(&lp).await?;
 
@@ -578,7 +590,11 @@ fn format_age(timestamp: &DateTime<Utc>) -> String {
 }
 
 pub async fn list_ingresses(client: Client, namespace: &str) -> Result<Vec<IngressInfo>> {
-    let ingresses: Api<Ingress> = Api::namespaced(client, namespace);
+    let ingresses: Api<Ingress> = if namespace.is_empty() {
+        Api::all(client)
+    } else {
+        Api::namespaced(client, namespace)
+    };
     let lp = ListParams::default();
     let ingress_list = ingresses.list(&lp).await?;
 
@@ -897,7 +913,11 @@ pub async fn get_resource_yaml(
 }
 
 pub async fn list_configmaps(client: Client, namespace: &str) -> Result<Vec<ConfigMapInfo>> {
-    let configmaps: Api<ConfigMap> = Api::namespaced(client, namespace);
+    let configmaps: Api<ConfigMap> = if namespace.is_empty() {
+        Api::all(client)
+    } else {
+        Api::namespaced(client, namespace)
+    };
     let lp = ListParams::default();
     let configmap_list = configmaps.list(&lp).await?;
 
@@ -932,7 +952,11 @@ pub async fn list_configmaps(client: Client, namespace: &str) -> Result<Vec<Conf
 }
 
 pub async fn list_secrets(client: Client, namespace: &str) -> Result<Vec<SecretInfo>> {
-    let secrets: Api<Secret> = Api::namespaced(client, namespace);
+    let secrets: Api<Secret> = if namespace.is_empty() {
+        Api::all(client)
+    } else {
+        Api::namespaced(client, namespace)
+    };
     let lp = ListParams::default();
     let secret_list = secrets.list(&lp).await?;
 
@@ -981,7 +1005,11 @@ pub async fn list_secrets(client: Client, namespace: &str) -> Result<Vec<SecretI
 }
 
 pub async fn list_statefulsets(client: Client, namespace: &str) -> Result<Vec<StatefulSetInfo>> {
-    let statefulsets: Api<StatefulSet> = Api::namespaced(client, namespace);
+    let statefulsets: Api<StatefulSet> = if namespace.is_empty() {
+        Api::all(client)
+    } else {
+        Api::namespaced(client, namespace)
+    };
     let lp = ListParams::default();
     let statefulset_list = statefulsets.list(&lp).await?;
 
@@ -1017,7 +1045,11 @@ pub async fn list_statefulsets(client: Client, namespace: &str) -> Result<Vec<St
 }
 
 pub async fn list_daemonsets(client: Client, namespace: &str) -> Result<Vec<DaemonSetInfo>> {
-    let daemonsets: Api<DaemonSet> = Api::namespaced(client, namespace);
+    let daemonsets: Api<DaemonSet> = if namespace.is_empty() {
+        Api::all(client)
+    } else {
+        Api::namespaced(client, namespace)
+    };
     let lp = ListParams::default();
     let daemonset_list = daemonsets.list(&lp).await?;
 
@@ -1058,7 +1090,11 @@ pub async fn list_daemonsets(client: Client, namespace: &str) -> Result<Vec<Daem
 }
 
 pub async fn list_jobs(client: Client, namespace: &str) -> Result<Vec<JobInfo>> {
-    let jobs: Api<Job> = Api::namespaced(client, namespace);
+    let jobs: Api<Job> = if namespace.is_empty() {
+        Api::all(client)
+    } else {
+        Api::namespaced(client, namespace)
+    };
     let lp = ListParams::default();
     let job_list = jobs.list(&lp).await?;
 
@@ -1112,7 +1148,11 @@ pub async fn list_jobs(client: Client, namespace: &str) -> Result<Vec<JobInfo>> 
 }
 
 pub async fn list_cronjobs(client: Client, namespace: &str) -> Result<Vec<CronJobInfo>> {
-    let cronjobs: Api<CronJob> = Api::namespaced(client, namespace);
+    let cronjobs: Api<CronJob> = if namespace.is_empty() {
+        Api::all(client)
+    } else {
+        Api::namespaced(client, namespace)
+    };
     let lp = ListParams::default();
     let cronjob_list = cronjobs.list(&lp).await?;
 
@@ -1257,7 +1297,11 @@ pub async fn list_nodes(client: Client) -> Result<Vec<NodeInfo>> {
 }
 
 pub async fn list_events(client: Client, namespace: &str) -> Result<Vec<EventInfo>> {
-    let events: Api<Event> = Api::namespaced(client, namespace);
+    let events: Api<Event> = if namespace.is_empty() {
+        Api::all(client)
+    } else {
+        Api::namespaced(client, namespace)
+    };
     let lp = ListParams::default();
     let event_list = events.list(&lp).await?;
 
@@ -1393,7 +1437,11 @@ pub async fn list_persistent_volume_claims(
     client: Client,
     namespace: &str,
 ) -> Result<Vec<PersistentVolumeClaimInfo>> {
-    let pvcs: Api<PersistentVolumeClaim> = Api::namespaced(client, namespace);
+    let pvcs: Api<PersistentVolumeClaim> = if namespace.is_empty() {
+        Api::all(client)
+    } else {
+        Api::namespaced(client, namespace)
+    };
     let lp = ListParams::default();
     let pvc_list = pvcs.list(&lp).await?;
 
@@ -1456,7 +1504,11 @@ pub async fn list_persistent_volume_claims(
 
 // RBAC Operations
 pub async fn list_roles(client: Client, namespace: &str) -> Result<Vec<RoleInfo>> {
-    let roles: Api<Role> = Api::namespaced(client, namespace);
+    let roles: Api<Role> = if namespace.is_empty() {
+        Api::all(client)
+    } else {
+        Api::namespaced(client, namespace)
+    };
     let lp = ListParams::default();
     let role_list = roles.list(&lp).await?;
 
@@ -1487,7 +1539,11 @@ pub async fn list_roles(client: Client, namespace: &str) -> Result<Vec<RoleInfo>
 }
 
 pub async fn list_role_bindings(client: Client, namespace: &str) -> Result<Vec<RoleBindingInfo>> {
-    let role_bindings: Api<RoleBinding> = Api::namespaced(client, namespace);
+    let role_bindings: Api<RoleBinding> = if namespace.is_empty() {
+        Api::all(client)
+    } else {
+        Api::namespaced(client, namespace)
+    };
     let lp = ListParams::default();
     let rb_list = role_bindings.list(&lp).await?;
 
@@ -1608,7 +1664,11 @@ pub async fn list_cluster_role_bindings(client: Client) -> Result<Vec<ClusterRol
 }
 
 pub async fn list_service_accounts(client: Client, namespace: &str) -> Result<Vec<ServiceAccountInfo>> {
-    let service_accounts: Api<ServiceAccount> = Api::namespaced(client, namespace);
+    let service_accounts: Api<ServiceAccount> = if namespace.is_empty() {
+        Api::all(client)
+    } else {
+        Api::namespaced(client, namespace)
+    };
     let lp = ListParams::default();
     let sa_list = service_accounts.list(&lp).await?;
 

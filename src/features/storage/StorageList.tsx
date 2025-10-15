@@ -266,6 +266,7 @@ function PersistentVolumesTable({ data, isLoading, error, searchQuery, onViewYam
 
 function PersistentVolumeClaimsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const showNamespaceColumn = !currentNamespace;
 
   const getStatusVariant = (status: string) => {
     switch (status.toLowerCase()) {
@@ -301,6 +302,7 @@ function PersistentVolumeClaimsTable({ data, isLoading, error, searchQuery, onVi
       <TableHeader>
         <TableRow>
           <TableHead>Name</TableHead>
+          {showNamespaceColumn && <TableHead>Namespace</TableHead>}
           <TableHead>Status</TableHead>
           <TableHead>Volume</TableHead>
           <TableHead>Capacity</TableHead>
@@ -323,6 +325,7 @@ function PersistentVolumeClaimsTable({ data, isLoading, error, searchQuery, onVi
           data.map((pvc: any) => (
           <TableRow key={pvc.name}>
             <TableCell className="font-medium">{pvc.name}</TableCell>
+            {showNamespaceColumn && <TableCell>{pvc.namespace}</TableCell>}
             <TableCell>
               <Badge variant={getStatusVariant(pvc.status)}>{pvc.status}</Badge>
             </TableCell>

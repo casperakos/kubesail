@@ -20,6 +20,7 @@ export function NamespaceSelector() {
       onChange={(e) => setCurrentNamespace(e.target.value)}
       className="w-48 h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
     >
+      <option value="">All Namespaces</option>
       {namespaces?.map((ns) => (
         <option key={ns.name} value={ns.name}>
           {ns.name}

@@ -271,6 +271,7 @@ export function RBACList() {
 
 function RolesTable({ data, isLoading, error, searchQuery, onViewYaml }: { data: RoleInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void }) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const showNamespaceColumn = !currentNamespace;
 
   if (isLoading) {
     return (
@@ -293,7 +294,7 @@ function RolesTable({ data, isLoading, error, searchQuery, onViewYaml }: { data:
       <TableHeader>
         <TableRow>
           <TableHead>Name</TableHead>
-          <TableHead>Namespace</TableHead>
+          {showNamespaceColumn && <TableHead>Namespace</TableHead>}
           <TableHead>Rules</TableHead>
           <TableHead>Age</TableHead>
           <TableHead className="text-right">Actions</TableHead>
@@ -312,7 +313,7 @@ function RolesTable({ data, isLoading, error, searchQuery, onViewYaml }: { data:
           data.map((role) => (
             <TableRow key={`${role.namespace}-${role.name}`}>
               <TableCell className="font-medium">{role.name}</TableCell>
-              <TableCell>{role.namespace}</TableCell>
+              {showNamespaceColumn && <TableCell>{role.namespace}</TableCell>}
               <TableCell>
                 <Badge variant="secondary">{role.rules_count}</Badge>
               </TableCell>
@@ -336,6 +337,7 @@ function RolesTable({ data, isLoading, error, searchQuery, onViewYaml }: { data:
 
 function RoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml }: { data: RoleBindingInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void }) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const showNamespaceColumn = !currentNamespace;
 
   if (isLoading) {
     return (
@@ -358,7 +360,7 @@ function RoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
       <TableHeader>
         <TableRow>
           <TableHead>Name</TableHead>
-          <TableHead>Namespace</TableHead>
+          {showNamespaceColumn && <TableHead>Namespace</TableHead>}
           <TableHead>Role</TableHead>
           <TableHead>Subjects</TableHead>
           <TableHead>Age</TableHead>
@@ -378,7 +380,7 @@ function RoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
           data.map((rb) => (
             <TableRow key={`${rb.namespace}-${rb.name}`}>
               <TableCell className="font-medium">{rb.name}</TableCell>
-              <TableCell>{rb.namespace}</TableCell>
+              {showNamespaceColumn && <TableCell>{rb.namespace}</TableCell>}
               <TableCell>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="text-xs">{rb.role_kind}</Badge>
@@ -542,6 +544,7 @@ function ClusterRoleBindingsTable({ data, isLoading, error, searchQuery, onViewY
 
 function ServiceAccountsTable({ data, isLoading, error, searchQuery, onViewYaml }: { data: ServiceAccountInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void }) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const showNamespaceColumn = !currentNamespace;
 
   if (isLoading) {
     return (
@@ -564,7 +567,7 @@ function ServiceAccountsTable({ data, isLoading, error, searchQuery, onViewYaml 
       <TableHeader>
         <TableRow>
           <TableHead>Name</TableHead>
-          <TableHead>Namespace</TableHead>
+          {showNamespaceColumn && <TableHead>Namespace</TableHead>}
           <TableHead>Secrets</TableHead>
           <TableHead>Age</TableHead>
           <TableHead className="text-right">Actions</TableHead>
@@ -583,7 +586,7 @@ function ServiceAccountsTable({ data, isLoading, error, searchQuery, onViewYaml 
           data.map((sa) => (
             <TableRow key={`${sa.namespace}-${sa.name}`}>
               <TableCell className="font-medium">{sa.name}</TableCell>
-              <TableCell>{sa.namespace}</TableCell>
+              {showNamespaceColumn && <TableCell>{sa.namespace}</TableCell>}
               <TableCell>
                 <Badge variant="secondary">{sa.secrets}</Badge>
               </TableCell>
