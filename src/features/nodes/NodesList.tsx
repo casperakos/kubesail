@@ -2,7 +2,9 @@ import { useState, useMemo } from "react";
 import { useNodes } from "../../hooks/useKube";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, Cpu, MemoryStick, Server, HardDrive, Box, Activity } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/Table";
+import { RefreshCw, Search, X, Cpu, MemoryStick, Server, Box, Activity, ExternalLink } from "lucide-react";
+import { NodeInfo } from "../../types";
 
 // Utility functions to parse and format resources
 const parseMemory = (mem: string): number => {
@@ -98,11 +100,145 @@ function ResourceBar({ label, allocatable, capacity, isMemory = false, icon }: R
   );
 }
 
+interface NodeDetailModalProps {
+  node: NodeInfo | null;
+  onClose: () => void;
+}
+
+function NodeDetailModal({ node, onClose }: NodeDetailModalProps) {
+  if (!node) return null;
+
+  const getStatusVariant = (status: string): "success" | "destructive" | "secondary" => {
+    if (status === "Ready") return "success";
+    if (status === "NotReady") return "destructive";
+    return "secondary";
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fade-in">
+      <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-card border border-border rounded-xl shadow-2xl">
+        {/* Header */}
+        <div className="sticky top-0 z-10 p-6 border-b border-border bg-card/95 backdrop-blur-sm">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-3">
+                <Server className="w-6 h-6 text-primary" />
+                <h2 className="text-2xl font-bold">{node.name}</h2>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={getStatusVariant(node.status)}>{node.status}</Badge>
+                {node.roles.length > 0 ? (
+                  node.roles.map((role) => (
+                    <Badge key={role} variant="secondary">
+                      {role}
+                    </Badge>
+                  ))
+                ) : (
+                  <Badge variant="outline">worker</Badge>
+                )}
+                {node.gpu_capacity && (
+                  <Badge variant="default" className="bg-gradient-to-r from-green-500 to-emerald-500">
+                    GPU x{node.gpu_capacity}
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-6">
+          {/* Resource Metrics */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Activity className="w-5 h-5" />
+              Resource Capacity
+            </h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <ResourceBar
+                label="CPU"
+                allocatable={node.cpu_allocatable}
+                capacity={node.cpu_capacity}
+                icon={<Cpu className="w-4 h-4" />}
+              />
+              <ResourceBar
+                label="Memory"
+                allocatable={node.memory_allocatable}
+                capacity={node.memory_capacity}
+                isMemory={true}
+                icon={<MemoryStick className="w-4 h-4" />}
+              />
+            </div>
+          </div>
+
+          {/* Additional Info Grid */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Node Information</h3>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-lg bg-muted/30">
+              <div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                  <Box className="w-3 h-3" />
+                  <span>Pods</span>
+                </div>
+                <p className="text-sm font-mono">
+                  {node.pods_allocatable} / {node.pods_capacity}
+                </p>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                  <Activity className="w-3 h-3" />
+                  <span>Version</span>
+                </div>
+                <p className="text-sm font-mono">{node.version}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Age</p>
+                <p className="text-sm font-medium">{node.age}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Internal IP</p>
+                <p className="text-sm font-mono">{node.internal_ip}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">External IP</p>
+                <p className="text-sm font-mono">{node.external_ip || "N/A"}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* System Info */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4">System Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-lg bg-muted/30">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">OS Image</p>
+                <p className="text-sm font-medium">{node.os_image}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Kernel Version</p>
+                <p className="text-sm font-mono">{node.kernel_version}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Container Runtime</p>
+                <p className="text-sm font-mono">{node.container_runtime}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function NodesList() {
   const { data: nodes, isLoading, error, refetch } = useNodes();
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedNode, setSelectedNode] = useState<NodeInfo | null>(null);
 
-  const getStatusVariant = (status: string) => {
+  const getStatusVariant = (status: string): "success" | "destructive" | "secondary" => {
     if (status === "Ready") return "success";
     if (status === "NotReady") return "destructive";
     return "secondary";
@@ -158,163 +294,192 @@ export function NodesList() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="p-6 rounded-xl border border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl shadow-lg space-y-4">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
-              Cluster Nodes
-            </h2>
-            <Badge variant="secondary" className="ml-2">
-              {filteredNodes?.length || 0} {searchQuery && `of ${nodes?.length || 0}`}
-            </Badge>
+    <>
+      <div className="space-y-6 animate-fade-in">
+        {/* Header */}
+        <div className="p-6 rounded-xl border border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl shadow-lg space-y-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+                Cluster Nodes
+              </h2>
+              <Badge variant="secondary" className="ml-2">
+                {filteredNodes?.length || 0} {searchQuery && `of ${nodes?.length || 0}`}
+              </Badge>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
           </div>
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
+
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search by name, status, role, version, or IP..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-10 py-2.5 text-sm bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all placeholder:text-muted-foreground"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search by name, status, role, version, or IP..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-10 py-2.5 text-sm bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all placeholder:text-muted-foreground"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+        {/* Nodes Table */}
+        {!filteredNodes || filteredNodes.length === 0 ? (
+          <div className="p-12 text-center rounded-xl border border-border/50 bg-gradient-to-br from-muted/30 to-muted/10 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
+                <Server className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground mb-1">No nodes found</h3>
+                <p className="text-sm text-muted-foreground">
+                  {searchQuery ? `No nodes found matching "${searchQuery}"` : "No nodes found in cluster"}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Roles</TableHead>
+                  <TableHead>CPU</TableHead>
+                  <TableHead>Memory</TableHead>
+                  <TableHead>Pods</TableHead>
+                  <TableHead>Version</TableHead>
+                  <TableHead>Age</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredNodes.map((node) => {
+                  const cpuPercent = calculatePercentage(node.cpu_allocatable, node.cpu_capacity, false);
+                  const memoryPercent = calculatePercentage(node.memory_allocatable, node.memory_capacity, true);
+
+                  return (
+                    <TableRow
+                      key={node.name}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => setSelectedNode(node)}
+                    >
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <Server className="w-4 h-4 text-muted-foreground" />
+                          {node.name}
+                          {node.gpu_capacity && (
+                            <Badge variant="default" className="ml-2 bg-gradient-to-r from-green-500 to-emerald-500 text-xs">
+                              GPU
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusVariant(node.status)} className="text-xs">
+                          {node.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {node.roles.length > 0 ? (
+                            node.roles.map((role) => (
+                              <Badge key={role} variant="secondary" className="text-xs">
+                                {role}
+                              </Badge>
+                            ))
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              worker
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-[60px]">
+                            <div className="text-xs text-muted-foreground mb-1">
+                              {formatCPU(node.cpu_allocatable)} / {formatCPU(node.cpu_capacity)}
+                            </div>
+                            <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${
+                                  cpuPercent > 90
+                                    ? "bg-green-500"
+                                    : cpuPercent > 70
+                                    ? "bg-blue-500"
+                                    : "bg-purple-500"
+                                }`}
+                                style={{ width: `${cpuPercent}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-[60px]">
+                            <div className="text-xs text-muted-foreground mb-1">
+                              {formatMemory(node.memory_allocatable)} / {formatMemory(node.memory_capacity)}
+                            </div>
+                            <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${
+                                  memoryPercent > 90
+                                    ? "bg-green-500"
+                                    : memoryPercent > 70
+                                    ? "bg-blue-500"
+                                    : "bg-purple-500"
+                                }`}
+                                style={{ width: `${memoryPercent}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs font-mono">
+                          {node.pods_allocatable} / {node.pods_capacity}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs font-mono">{node.version}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-xs">{node.age}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedNode(node);
+                        }}>
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
 
-      {/* Nodes List */}
-      {!filteredNodes || filteredNodes.length === 0 ? (
-        <div className="p-12 text-center rounded-xl border border-border/50 bg-gradient-to-br from-muted/30 to-muted/10 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
-              <Server className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground mb-1">No nodes found</h3>
-              <p className="text-sm text-muted-foreground">
-                {searchQuery ? `No nodes found matching "${searchQuery}"` : "No nodes found in cluster"}
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="grid gap-6">
-          {filteredNodes.map((node) => (
-            <div
-              key={node.name}
-              className="border border-border/50 rounded-xl p-6 bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm hover:border-primary/50 hover:shadow-lg transition-all"
-            >
-              {/* Node Header */}
-              <div className="flex items-start justify-between mb-6 pb-4 border-b border-border/50">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Server className="w-5 h-5 text-primary" />
-                    <h3 className="text-xl font-bold">{node.name}</h3>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant={getStatusVariant(node.status)}>{node.status}</Badge>
-                    {node.roles.length > 0 ? (
-                      node.roles.map((role) => (
-                        <Badge key={role} variant="secondary">
-                          {role}
-                        </Badge>
-                      ))
-                    ) : (
-                      <Badge variant="outline">worker</Badge>
-                    )}
-                    {node.gpu_capacity && (
-                      <Badge variant="default" className="bg-gradient-to-r from-green-500 to-emerald-500">
-                        GPU x{node.gpu_capacity}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-muted-foreground">Age</p>
-                  <p className="text-sm font-medium">{node.age}</p>
-                </div>
-              </div>
-
-              {/* Resource Metrics */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <ResourceBar
-                  label="CPU"
-                  allocatable={node.cpu_allocatable}
-                  capacity={node.cpu_capacity}
-                  icon={<Cpu className="w-4 h-4" />}
-                />
-                <ResourceBar
-                  label="Memory"
-                  allocatable={node.memory_allocatable}
-                  capacity={node.memory_capacity}
-                  isMemory={true}
-                  icon={<MemoryStick className="w-4 h-4" />}
-                />
-              </div>
-
-              {/* Additional Info Grid */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-lg bg-muted/30">
-                <div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                    <Box className="w-3 h-3" />
-                    <span>Pods</span>
-                  </div>
-                  <p className="text-sm font-mono">{node.pods_allocatable} / {node.pods_capacity}</p>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                    <Activity className="w-3 h-3" />
-                    <span>Version</span>
-                  </div>
-                  <p className="text-sm font-mono">{node.version}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Internal IP</p>
-                  <p className="text-sm font-mono">{node.internal_ip}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">External IP</p>
-                  <p className="text-sm font-mono">{node.external_ip || "N/A"}</p>
-                </div>
-              </div>
-
-              {/* System Info */}
-              <div className="mt-4 pt-4 border-t border-border/50">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">OS Image</p>
-                    <p className="font-medium">{node.os_image}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Kernel</p>
-                    <p className="font-mono text-xs">{node.kernel_version}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Container Runtime</p>
-                    <p className="font-mono text-xs">{node.container_runtime}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+      {/* Detail Modal */}
+      {selectedNode && <NodeDetailModal node={selectedNode} onClose={() => setSelectedNode(null)} />}
+    </>
   );
 }
