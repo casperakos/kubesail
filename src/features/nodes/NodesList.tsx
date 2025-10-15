@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNodes } from "../../hooks/useKube";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/Table";
-import { RefreshCw, Search, X, Cpu, MemoryStick, Server, Box, Activity, ExternalLink } from "lucide-react";
+import { RefreshCw, Search, X, Cpu, MemoryStick, Server, Box, Activity, ExternalLink, HardDrive, Network, Calendar } from "lucide-react";
 import { NodeInfo } from "../../types";
 
 // Utility functions to parse and format resources
@@ -114,6 +114,18 @@ function NodeDetailModal({ node, onClose }: NodeDetailModalProps) {
     return "secondary";
   };
 
+  // Handle ESC key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fade-in">
       <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-card border border-border rounded-xl shadow-2xl">
@@ -151,10 +163,10 @@ function NodeDetailModal({ node, onClose }: NodeDetailModalProps) {
 
         {/* Content */}
         <div className="p-6 space-y-6">
-          {/* Resource Metrics */}
+          {/* Resource Capacity Section */}
           <div>
             <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Activity className="w-5 h-5" />
+              <Activity className="w-5 h-5 text-primary" />
               Resource Capacity
             </h3>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -172,58 +184,228 @@ function NodeDetailModal({ node, onClose }: NodeDetailModalProps) {
                 icon={<MemoryStick className="w-4 h-4" />}
               />
             </div>
-          </div>
 
-          {/* Additional Info Grid */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Node Information</h3>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-lg bg-muted/30">
-              <div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                  <Box className="w-3 h-3" />
-                  <span>Pods</span>
+            {/* Resource Summary Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+              <div className="p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Cpu className="w-4 h-4 text-blue-500" />
+                  <p className="text-xs font-semibold text-blue-500">CPU Capacity</p>
                 </div>
-                <p className="text-sm font-mono">
-                  {node.pods_allocatable} / {node.pods_capacity}
+                <p className="text-2xl font-bold">{formatCPU(node.cpu_capacity)}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formatCPU(node.cpu_allocatable)} allocatable
                 </p>
               </div>
-              <div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-                  <Activity className="w-3 h-3" />
-                  <span>Version</span>
+
+              <div className="p-4 rounded-lg bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <MemoryStick className="w-4 h-4 text-purple-500" />
+                  <p className="text-xs font-semibold text-purple-500">Memory Capacity</p>
                 </div>
-                <p className="text-sm font-mono">{node.version}</p>
+                <p className="text-2xl font-bold">{formatMemory(node.memory_capacity)}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formatMemory(node.memory_allocatable)} allocatable
+                </p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Age</p>
-                <p className="text-sm font-medium">{node.age}</p>
+
+              <div className="p-4 rounded-lg bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border border-cyan-500/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Box className="w-4 h-4 text-cyan-500" />
+                  <p className="text-xs font-semibold text-cyan-500">Pods Capacity</p>
+                </div>
+                <p className="text-2xl font-bold">{node.pods_capacity}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {node.pods_allocatable} allocatable
+                </p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Internal IP</p>
-                <p className="text-sm font-mono">{node.internal_ip}</p>
+
+              {node.gpu_capacity && (
+                <div className="p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <HardDrive className="w-4 h-4 text-green-500" />
+                    <p className="text-xs font-semibold text-green-500">GPU Capacity</p>
+                  </div>
+                  <p className="text-2xl font-bold">{node.gpu_capacity}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {node.gpu_capacity === "1" ? "GPU" : "GPUs"}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Node Information Section */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Server className="w-5 h-5 text-primary" />
+              Node Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
+                <div className="flex items-center gap-2 mb-3">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-sm font-semibold">General</p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-xs text-muted-foreground">Kubelet Version</span>
+                    <span className="text-sm font-mono">{node.version}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-xs text-muted-foreground">Age</span>
+                    <span className="text-sm font-medium">{node.age}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-xs text-muted-foreground">Roles</span>
+                    <div className="flex gap-1">
+                      {node.roles.length > 0 ? (
+                        node.roles.map((role) => (
+                          <Badge key={role} variant="secondary" className="text-xs">
+                            {role}
+                          </Badge>
+                        ))
+                      ) : (
+                        <Badge variant="outline" className="text-xs">
+                          worker
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">External IP</p>
-                <p className="text-sm font-mono">{node.external_ip || "N/A"}</p>
+
+              <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
+                <div className="flex items-center gap-2 mb-3">
+                  <Network className="w-4 h-4 text-muted-foreground" />
+                  <p className="text-sm font-semibold">Network</p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-xs text-muted-foreground">Internal IP</span>
+                    <span className="text-sm font-mono">{node.internal_ip}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-xs text-muted-foreground">External IP</span>
+                    <span className="text-sm font-mono">{node.external_ip || "N/A"}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-xs text-muted-foreground">Status</span>
+                    <Badge variant={getStatusVariant(node.status)} className="text-xs">
+                      {node.status}
+                    </Badge>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* System Info */}
+          {/* System Information Section */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">System Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-lg bg-muted/30">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">OS Image</p>
-                <p className="text-sm font-medium">{node.os_image}</p>
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <HardDrive className="w-5 h-5 text-primary" />
+              System Information
+            </h3>
+            <div className="p-4 rounded-lg bg-muted/30 border border-border/50">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Operating System</p>
+                  <p className="text-sm font-medium">{node.os_image}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Kernel Version</p>
+                  <p className="text-sm font-mono">{node.kernel_version}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Container Runtime</p>
+                  <p className="text-sm font-mono">{node.container_runtime}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Architecture</p>
+                  <p className="text-sm font-mono">amd64</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Kernel Version</p>
-                <p className="text-sm font-mono">{node.kernel_version}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Container Runtime</p>
-                <p className="text-sm font-mono">{node.container_runtime}</p>
+            </div>
+          </div>
+
+          {/* Resource Allocation Summary */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary" />
+              Resource Allocation
+            </h3>
+            <div className="p-4 rounded-lg bg-gradient-to-br from-muted/50 to-muted/20 border border-border/50">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">CPU Allocation</p>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total:</span>
+                      <span className="font-mono">{formatCPU(node.cpu_capacity)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Allocatable:</span>
+                      <span className="font-mono text-green-600 dark:text-green-400">
+                        {formatCPU(node.cpu_allocatable)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">System Reserved:</span>
+                      <span className="font-mono text-orange-600 dark:text-orange-400">
+                        {formatCPU(
+                          (parseCPU(node.cpu_capacity) - parseCPU(node.cpu_allocatable)).toString()
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Memory Allocation</p>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total:</span>
+                      <span className="font-mono">{formatMemory(node.memory_capacity)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Allocatable:</span>
+                      <span className="font-mono text-green-600 dark:text-green-400">
+                        {formatMemory(node.memory_allocatable)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">System Reserved:</span>
+                      <span className="font-mono text-orange-600 dark:text-orange-400">
+                        {formatMemory(
+                          (parseMemory(node.memory_capacity) - parseMemory(node.memory_allocatable))
+                            .toFixed(1) + "Gi"
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">Pod Allocation</p>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total:</span>
+                      <span className="font-mono">{node.pods_capacity}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Allocatable:</span>
+                      <span className="font-mono text-green-600 dark:text-green-400">
+                        {node.pods_allocatable}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">System Reserved:</span>
+                      <span className="font-mono text-orange-600 dark:text-orange-400">
+                        {parseInt(node.pods_capacity) - parseInt(node.pods_allocatable)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
