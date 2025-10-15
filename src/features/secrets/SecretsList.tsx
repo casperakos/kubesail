@@ -11,7 +11,7 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Eye, EyeOff, Search, X, FileText, Trash2 } from "lucide-react";
+import { RefreshCw, Eye, EyeOff, Search, X, Code, Trash2 } from "lucide-react";
 import { SecretInfo } from "../../types";
 import { YamlViewer } from "../../components/YamlViewer";
 
@@ -173,7 +173,7 @@ export function SecretsList() {
                     onClick={() => setSelectedResource({name: secret.name, namespace: secret.namespace})}
                     title="View YAML"
                   >
-                    <FileText className="w-4 h-4" />
+                    <Code className="w-4 h-4" />
                   </Button>
                   <Button
                     variant="ghost"

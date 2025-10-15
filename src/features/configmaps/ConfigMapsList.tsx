@@ -11,7 +11,7 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Eye, Search, X, FileText, Trash2 } from "lucide-react";
+import { RefreshCw, Eye, Search, X, Code, Trash2 } from "lucide-react";
 import { ConfigMapInfo } from "../../types";
 import { YamlViewer } from "../../components/YamlViewer";
 
@@ -160,7 +160,7 @@ export function ConfigMapsList() {
                     onClick={() => setSelectedResource({name: cm.name, namespace: cm.namespace})}
                     title="View YAML"
                   >
-                    <FileText className="w-4 h-4" />
+                    <Code className="w-4 h-4" />
                   </Button>
                   <Button
                     variant="ghost"

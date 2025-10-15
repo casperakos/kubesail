@@ -10,7 +10,7 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, FileText, RotateCw, Trash2 } from "lucide-react";
+import { RefreshCw, Search, X, FileText, RotateCw, Trash2, Code, ScrollText } from "lucide-react";
 import { useState, useMemo } from "react";
 import { YamlViewer } from "../../components/YamlViewer";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -305,7 +305,7 @@ export function DeploymentsList() {
                       onClick={() => setSelectedDeployment({name: deployment.name, namespace: deployment.namespace})}
                       title="View YAML"
                     >
-                      <FileText className="w-4 h-4" />
+                      <Code className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -317,7 +317,7 @@ export function DeploymentsList() {
                       {loadingPodsFor === deployment.name ? (
                         <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <FileText className="w-4 h-4" />
+                        <ScrollText className="w-4 h-4" />
                       )}
                     </Button>
                     <Button

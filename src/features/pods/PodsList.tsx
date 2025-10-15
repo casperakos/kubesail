@@ -11,7 +11,7 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { Trash2, RefreshCw, FileText, Code, Search, X, ArrowRightLeft } from "lucide-react";
+import { Trash2, RefreshCw, FileText, Code, Search, X, ArrowRightLeft, ScrollText } from "lucide-react";
 import { LogsViewer } from "../logs/LogsViewer";
 import { YamlViewer } from "../../components/YamlViewer";
 import { PortForwardModal } from "../../components/PortForwardModal";
@@ -327,7 +327,7 @@ export function PodsList() {
                     onClick={() => setSelectedPodForLogs({name: pod.name, namespace: pod.namespace})}
                     title="View logs"
                   >
-                    <FileText className="w-4 h-4" />
+                    <ScrollText className="w-4 h-4" />
                   </Button>
                   <Button
                     variant="ghost"

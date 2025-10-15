@@ -10,7 +10,7 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Shield, Globe, Search, X, FileText } from "lucide-react";
+import { RefreshCw, Shield, Globe, Search, X, Code } from "lucide-react";
 import { IngressInfo } from "../../types";
 import { useState, useMemo } from "react";
 import { YamlViewer } from "../../components/YamlViewer";
@@ -223,7 +223,7 @@ export function IngressesList() {
                   size="sm"
                   onClick={() => setSelectedResource({name: ingress.name, namespace: ingress.namespace})}
                 >
-                  <FileText className="w-4 h-4" />
+                  <Code className="w-4 h-4" />
                 </Button>
               </TableCell>
             </TableRow>

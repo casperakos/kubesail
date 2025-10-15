@@ -10,7 +10,7 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, FileText, ArrowRightLeft, Trash2 } from "lucide-react";
+import { RefreshCw, Search, X, Code, ArrowRightLeft, Trash2 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { YamlViewer } from "../../components/YamlViewer";
 import { PortForwardModal } from "../../components/PortForwardModal";
@@ -226,7 +226,7 @@ export function ServicesList() {
                     onClick={() => setSelectedResource({name: service.name, namespace: service.namespace})}
                     title="View YAML"
                   >
-                    <FileText className="w-4 h-4" />
+                    <Code className="w-4 h-4" />
                   </Button>
                   <Button
                     variant="ghost"

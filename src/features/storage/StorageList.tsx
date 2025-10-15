@@ -14,7 +14,7 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, FileText } from "lucide-react";
+import { RefreshCw, Search, X, Code } from "lucide-react";
 import { YamlViewer } from "../../components/YamlViewer";
 
 type StorageType = "pv" | "pvc";
@@ -253,7 +253,7 @@ function PersistentVolumesTable({ data, isLoading, error, searchQuery, onViewYam
                 size="sm"
                 onClick={() => onViewYaml({name: pv.name})}
               >
-                <FileText className="w-4 h-4" />
+                <Code className="w-4 h-4" />
               </Button>
             </TableCell>
           </TableRow>
@@ -352,7 +352,7 @@ function PersistentVolumeClaimsTable({ data, isLoading, error, searchQuery, onVi
                 size="sm"
                 onClick={() => onViewYaml({name: pvc.name, namespace: pvc.namespace})}
               >
-                <FileText className="w-4 h-4" />
+                <Code className="w-4 h-4" />
               </Button>
             </TableCell>
           </TableRow>

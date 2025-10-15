@@ -25,7 +25,7 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, FileText, RotateCw, Trash2, Pause, Play } from "lucide-react";
+import { RefreshCw, Search, X, FileText, RotateCw, Trash2, Pause, Play, Code, ScrollText } from "lucide-react";
 import { YamlViewer } from "../../components/YamlViewer";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
@@ -434,7 +434,7 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
                     onClick={() => onViewYaml({name: sts.name, namespace: sts.namespace})}
                     title="View YAML"
                   >
-                    <FileText className="w-4 h-4" />
+                    <Code className="w-4 h-4" />
                   </Button>
                   <Button
                     variant="ghost"
@@ -446,7 +446,7 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
                     {loadingPodsFor === sts.name ? (
                       <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     ) : (
-                      <FileText className="w-4 h-4" />
+                      <ScrollText className="w-4 h-4" />
                     )}
                   </Button>
                   <Button
@@ -763,7 +763,7 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
                     onClick={() => onViewYaml({name: ds.name, namespace: ds.namespace})}
                     title="View YAML"
                   >
-                    <FileText className="w-4 h-4" />
+                    <Code className="w-4 h-4" />
                   </Button>
                   <Button
                     variant="ghost"
@@ -775,7 +775,7 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
                     {loadingPodsForDS === ds.name ? (
                       <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     ) : (
-                      <FileText className="w-4 h-4" />
+                      <ScrollText className="w-4 h-4" />
                     )}
                   </Button>
                   <Button
@@ -1015,7 +1015,7 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
                     onClick={() => onViewYaml({name: job.name, namespace: job.namespace})}
                     title="View YAML"
                   >
-                    <FileText className="w-4 h-4" />
+                    <Code className="w-4 h-4" />
                   </Button>
                   <Button
                     variant="ghost"
@@ -1027,7 +1027,7 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
                     {loadingPodsForJob === job.name ? (
                       <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     ) : (
-                      <FileText className="w-4 h-4" />
+                      <ScrollText className="w-4 h-4" />
                     )}
                   </Button>
                   <Button
@@ -1263,7 +1263,7 @@ function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any)
                     onClick={() => onViewYaml({name: cj.name, namespace: cj.namespace})}
                     title="View YAML"
                   >
-                    <FileText className="w-4 h-4" />
+                    <Code className="w-4 h-4" />
                   </Button>
                   {cj.suspend ? (
                     <Button

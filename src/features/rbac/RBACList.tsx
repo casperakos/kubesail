@@ -17,7 +17,7 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, FileText } from "lucide-react";
+import { RefreshCw, Search, X, Code } from "lucide-react";
 import { YamlViewer } from "../../components/YamlViewer";
 import type {
   RoleInfo,
@@ -324,7 +324,7 @@ function RolesTable({ data, isLoading, error, searchQuery, onViewYaml }: { data:
                   size="sm"
                   onClick={() => onViewYaml({name: role.name, namespace: role.namespace})}
                 >
-                  <FileText className="w-4 h-4" />
+                  <Code className="w-4 h-4" />
                 </Button>
               </TableCell>
             </TableRow>
@@ -403,7 +403,7 @@ function RoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
                   size="sm"
                   onClick={() => onViewYaml({name: rb.name, namespace: rb.namespace})}
                 >
-                  <FileText className="w-4 h-4" />
+                  <Code className="w-4 h-4" />
                 </Button>
               </TableCell>
             </TableRow>
@@ -462,7 +462,7 @@ function ClusterRolesTable({ data, isLoading, error, searchQuery, onViewYaml }: 
                   size="sm"
                   onClick={() => onViewYaml({name: cr.name})}
                 >
-                  <FileText className="w-4 h-4" />
+                  <Code className="w-4 h-4" />
                 </Button>
               </TableCell>
             </TableRow>
@@ -531,7 +531,7 @@ function ClusterRoleBindingsTable({ data, isLoading, error, searchQuery, onViewY
                   size="sm"
                   onClick={() => onViewYaml({name: crb.name})}
                 >
-                  <FileText className="w-4 h-4" />
+                  <Code className="w-4 h-4" />
                 </Button>
               </TableCell>
             </TableRow>
@@ -597,7 +597,7 @@ function ServiceAccountsTable({ data, isLoading, error, searchQuery, onViewYaml 
                   size="sm"
                   onClick={() => onViewYaml({name: sa.name, namespace: sa.namespace})}
                 >
-                  <FileText className="w-4 h-4" />
+                  <Code className="w-4 h-4" />
                 </Button>
               </TableCell>
             </TableRow>
