@@ -202,8 +202,7 @@ export type ResourceType =
   | "deployments"
   | "services"
   | "namespaces"
-  | "ingresses"
-  | "istio"
+  | "gateways"
   | "configmaps"
   | "secrets"
   | "statefulsets"
@@ -214,7 +213,16 @@ export type ResourceType =
   | "events"
   | "storage"
   | "rbac"
-  | "portforwards";
+  | "portforwards"
+  | "crds"
+  | "argocd"
+  | "flux"
+  | "external-secrets"
+  | "sealed-secrets"
+  | "cert-manager"
+  | "crossplane"
+  | "argo-workflows"
+  | "argo-events";
 
 // RBAC Types
 export interface SubjectInfo {

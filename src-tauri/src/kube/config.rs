@@ -103,3 +103,41 @@ pub fn get_current_context(config: &KubeConfig) -> Option<&ContextEntry> {
 pub fn get_cluster_by_name<'a>(config: &'a KubeConfig, name: &str) -> Option<&'a ClusterEntry> {
     config.clusters.iter().find(|c| c.name == name)
 }
+
+pub fn switch_context(context_name: &str) -> Result<()> {
+    let path = get_kubeconfig_path()?;
+    let mut config = load_kubeconfig()?;
+
+    // Verify the context exists
+    if !config.contexts.iter().any(|ctx| ctx.name == context_name) {
+        return Err(anyhow::anyhow!("Context '{}' not found in kubeconfig", context_name));
+    }
+
+    // Update current context
+    config.current_context = context_name.to_string();
+
+    // Write back to file
+    let contents = serde_yaml::to_string(&config)
+        .map_err(|e| anyhow::anyhow!("Failed to serialize kubeconfig: {}", e))?;
+
+    std::fs::write(&path, contents)
+        .map_err(|e| anyhow::anyhow!("Failed to write kubeconfig to {:?}: {}", path, e))?;
+
+    Ok(())
+}
+
+pub fn load_custom_kubeconfig(path: &str) -> Result<KubeConfig> {
+    let path = PathBuf::from(path);
+    let contents = std::fs::read_to_string(&path)
+        .map_err(|e| anyhow::anyhow!("Failed to read kubeconfig from {:?}: {}", path, e))?;
+
+    let config: KubeConfig = serde_yaml::from_str(&contents)
+        .map_err(|e| anyhow::anyhow!("Failed to parse kubeconfig YAML: {}", e))?;
+
+    Ok(config)
+}
+
+pub fn set_kubeconfig_path(path: &str) -> Result<()> {
+    std::env::set_var("KUBECONFIG", path);
+    Ok(())
+}

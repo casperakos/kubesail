@@ -5,7 +5,9 @@ use k8s_openapi::api::batch::v1::{Job, CronJob};
 use k8s_openapi::api::core::v1::{Namespace, Pod, Service, ConfigMap, Secret, Node, Event, PersistentVolume, PersistentVolumeClaim, ServiceAccount};
 use k8s_openapi::api::networking::v1::Ingress;
 use k8s_openapi::api::rbac::v1::{Role, RoleBinding, ClusterRole, ClusterRoleBinding};
-use kube::api::{Api, ListParams, LogParams};
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+use kube::api::{Api, ListParams, LogParams, DynamicObject};
+use kube::discovery::{ApiResource, Scope};
 use kube::{Client, ResourceExt};
 use std::time::SystemTime;
 use std::collections::HashMap;
@@ -16,6 +18,7 @@ use crate::types::{
     StatefulSetInfo, DaemonSetInfo, JobInfo, CronJobInfo, NodeInfo, EventInfo,
     PersistentVolumeInfo, PersistentVolumeClaimInfo, RoleInfo, RoleBindingInfo,
     ClusterRoleInfo, ClusterRoleBindingInfo, ServiceAccountInfo, SubjectInfo,
+    CRDInfo, CustomResourceInfo,
 };
 
 pub async fn list_namespaces(client: Client) -> Result<Vec<NamespaceInfo>> {
@@ -279,6 +282,21 @@ pub async fn get_pod_logs(
     }
 
     Ok(result)
+}
+
+pub async fn get_pod_containers(client: Client, namespace: &str, pod_name: &str) -> Result<Vec<String>> {
+    let pods: Api<Pod> = Api::namespaced(client, namespace);
+    let pod = pods.get(pod_name).await?;
+
+    let containers = pod
+        .spec
+        .ok_or_else(|| anyhow::anyhow!("Pod has no spec"))?
+        .containers
+        .iter()
+        .map(|c| c.name.clone())
+        .collect();
+
+    Ok(containers)
 }
 
 pub async fn delete_pod(client: Client, namespace: &str, pod_name: &str) -> Result<()> {
@@ -915,6 +933,137 @@ pub async fn get_resource_yaml(
     };
 
     Ok(yaml)
+}
+
+pub async fn get_custom_resource_yaml(
+    client: Client,
+    group: &str,
+    version: &str,
+    plural: &str,
+    name: &str,
+    namespace: Option<&str>,
+) -> Result<String> {
+    let api_resource = ApiResource {
+        group: group.to_string(),
+        version: version.to_string(),
+        api_version: if group.is_empty() {
+            version.to_string()
+        } else {
+            format!("{}/{}", group, version)
+        },
+        kind: plural.to_string(),
+        plural: plural.to_string(),
+    };
+
+    let api: Api<DynamicObject> = if let Some(ns) = namespace {
+        Api::namespaced_with(client, ns, &api_resource)
+    } else {
+        Api::all_with(client, &api_resource)
+    };
+
+    let resource = api.get(name).await?;
+    let yaml = serde_yaml::to_string(&resource)?;
+    Ok(yaml)
+}
+
+pub async fn describe_custom_resource(
+    client: Client,
+    group: &str,
+    version: &str,
+    plural: &str,
+    name: &str,
+    namespace: Option<&str>,
+) -> Result<String> {
+    use k8s_openapi::api::core::v1::Event;
+    use kube::api::ListParams;
+
+    let yaml = get_custom_resource_yaml(client.clone(), group, version, plural, name, namespace).await?;
+
+    let mut description = String::new();
+    description.push_str(&format!("Name: {}\n", name));
+    if let Some(ns) = namespace {
+        description.push_str(&format!("Namespace: {}\n", ns));
+    }
+    description.push_str(&format!("API Version: {}\n", if group.is_empty() {
+        version.to_string()
+    } else {
+        format!("{}/{}", group, version)
+    }));
+    description.push_str("\n");
+    description.push_str("Details:\n");
+    description.push_str(&yaml);
+
+    // Add Events section
+    description.push_str("\n\nEvents:\n");
+    let events: Api<Event> = if let Some(ns) = namespace {
+        Api::namespaced(client, ns)
+    } else {
+        Api::all(client)
+    };
+
+    let event_lp = ListParams::default().fields(&format!("involvedObject.name={}", name));
+    if let Ok(event_list) = events.list(&event_lp).await {
+        if event_list.items.is_empty() {
+            description.push_str("  <none>\n");
+        } else {
+            description.push_str(&format!("  Type    Reason    Age    Message\n"));
+            description.push_str("  ----    ------    ---    -------\n");
+            for event in event_list.items.iter().take(10) {
+                let event_type = event.type_.as_deref().unwrap_or("Normal");
+                let reason = event.reason.as_deref().unwrap_or("");
+                let message = event.message.as_deref().unwrap_or("");
+                let age = event.last_timestamp.as_ref()
+                    .map(|ts| format_age(&ts.0))
+                    .unwrap_or_else(|| "Unknown".to_string());
+
+                description.push_str(&format!("  {}    {}    {}    {}\n",
+                    event_type, reason, age, message
+                ));
+            }
+        }
+    } else {
+        description.push_str("  <unable to fetch events>\n");
+    }
+
+    Ok(description)
+}
+
+pub async fn sync_argocd_app(
+    client: Client,
+    name: &str,
+    namespace: &str,
+) -> Result<()> {
+    use kube::api::{ApiResource, DynamicObject, Patch, PatchParams};
+
+    // Define the ArgoCD Application API resource
+    let api_resource = ApiResource {
+        group: "argoproj.io".to_string(),
+        version: "v1alpha1".to_string(),
+        api_version: "argoproj.io/v1alpha1".to_string(),
+        kind: "Application".to_string(),
+        plural: "applications".to_string(),
+    };
+
+    let api: Api<DynamicObject> = Api::namespaced_with(client, namespace, &api_resource);
+
+    // Create a patch to trigger sync operation
+    // This sets the operation field which tells ArgoCD to sync the application
+    let patch = serde_json::json!({
+        "operation": {
+            "sync": {
+                "revision": "HEAD"
+            }
+        }
+    });
+
+    api.patch(
+        name,
+        &PatchParams::default(),
+        &Patch::Merge(&patch),
+    )
+    .await?;
+
+    Ok(())
 }
 
 pub async fn list_configmaps(client: Client, namespace: &str) -> Result<Vec<ConfigMapInfo>> {
@@ -1652,7 +1801,7 @@ pub async fn describe_resource(
     use kube::api::ListParams;
 
     // Get the resource YAML first
-    let yaml = get_resource_yaml(client.clone(), resource_type, namespace, name).await?;
+    let yaml = get_resource_yaml(client.clone(), resource_type, namespace.unwrap_or("default"), name).await?;
 
     let mut description = String::new();
     description.push_str(&format!("Name: {}\n", name));
@@ -2358,5 +2507,174 @@ pub async fn apply_resource_yaml(
         }
     }
 
+    Ok(())
+}
+
+// CRD Operations
+pub async fn list_crds(client: Client) -> Result<Vec<CRDInfo>> {
+    let crds: Api<CustomResourceDefinition> = Api::all(client);
+    let lp = ListParams::default();
+    let crd_list = crds.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for crd in crd_list {
+        let name = crd.metadata.name.unwrap_or_default();
+
+        let spec = crd.spec;
+        let group = spec.group.clone();
+
+        // Get the served version (prefer storage version)
+        let version = spec
+            .versions
+            .iter()
+            .find(|v| v.storage)
+            .or_else(|| spec.versions.first())
+            .map(|v| v.name.clone())
+            .unwrap_or_else(|| "unknown".to_string());
+
+        let kind = spec.names.kind.clone();
+        let plural = spec.names.plural.clone();
+        let singular = spec.names.singular.clone().unwrap_or_else(|| kind.to_lowercase());
+
+        let scope = match spec.scope.as_str() {
+            "Namespaced" => "Namespaced".to_string(),
+            "Cluster" => "Cluster".to_string(),
+            _ => "Unknown".to_string(),
+        };
+
+        let categories = spec
+            .names
+            .categories
+            .unwrap_or_default();
+
+        let age = crd
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        result.push(CRDInfo {
+            name,
+            group,
+            version,
+            kind,
+            plural,
+            singular,
+            scope,
+            age,
+            categories,
+        });
+    }
+
+    // Sort by name
+    result.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(result)
+}
+
+pub async fn list_custom_resources(
+    client: Client,
+    group: &str,
+    version: &str,
+    plural: &str,
+    namespace: Option<&str>,
+) -> Result<Vec<CustomResourceInfo>> {
+    // Create ApiResource for dynamic discovery
+    let api_resource = ApiResource {
+        group: group.to_string(),
+        version: version.to_string(),
+        api_version: if group.is_empty() {
+            version.to_string()
+        } else {
+            format!("{}/{}", group, version)
+        },
+        kind: plural.to_string(), // We'll use plural as kind placeholder
+        plural: plural.to_string(),
+    };
+
+    // Create dynamic API
+    let api: Api<DynamicObject> = if let Some(ns) = namespace {
+        Api::namespaced_with(client, ns, &api_resource)
+    } else {
+        Api::all_with(client, &api_resource)
+    };
+
+    let lp = ListParams::default();
+    let list = api.list(&lp).await?;
+
+    let mut result = Vec::new();
+
+    for item in list {
+        let name = item.metadata.name.clone().unwrap_or_default();
+        let namespace = item.metadata.namespace.clone();
+
+        let kind = item.types.as_ref()
+            .map(|t| t.kind.clone())
+            .unwrap_or_else(|| plural.to_string());
+
+        let api_version = item.types.as_ref()
+            .map(|t| t.api_version.clone())
+            .unwrap_or_else(|| {
+                if group.is_empty() {
+                    version.to_string()
+                } else {
+                    format!("{}/{}", group, version)
+                }
+            });
+
+        let age = item
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map(|ts| format_age(&ts.0))
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        // Store full metadata as JSON for later use
+        let metadata = serde_json::to_value(&item).unwrap_or(serde_json::Value::Null);
+
+        result.push(CustomResourceInfo {
+            name,
+            namespace,
+            kind,
+            api_version,
+            age,
+            metadata,
+        });
+    }
+
+    Ok(result)
+}
+
+pub async fn delete_custom_resource(
+    client: Client,
+    group: &str,
+    version: &str,
+    plural: &str,
+    name: &str,
+    namespace: Option<&str>,
+) -> Result<()> {
+    use kube::api::DeleteParams;
+
+    let api_resource = ApiResource {
+        group: group.to_string(),
+        version: version.to_string(),
+        api_version: if group.is_empty() {
+            version.to_string()
+        } else {
+            format!("{}/{}", group, version)
+        },
+        kind: plural.to_string(),
+        plural: plural.to_string(),
+    };
+
+    let api: Api<DynamicObject> = if let Some(ns) = namespace {
+        Api::namespaced_with(client, ns, &api_resource)
+    } else {
+        Api::all_with(client, &api_resource)
+    };
+
+    api.delete(name, &DeleteParams::default()).await?;
     Ok(())
 }

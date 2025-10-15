@@ -126,7 +126,7 @@ export function Dashboard() {
       {/* Header */}
       <div className="flex justify-between items-center p-6 rounded-xl border border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl shadow-lg">
         <div className="flex items-center gap-3">
-          <div className="w-1 h-12 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+          <div className="w-1 h-12 bg-gradient-to-b from-slate-500 to-zinc-500 rounded-full"></div>
           <div>
             <h2 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
               Cluster Dashboard

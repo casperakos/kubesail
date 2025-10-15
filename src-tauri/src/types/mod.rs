@@ -300,3 +300,27 @@ pub struct PortForwardInfo {
     pub remote_port: u16,
     pub status: String,
 }
+
+// CRD Types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CRDInfo {
+    pub name: String,
+    pub group: String,
+    pub version: String,
+    pub kind: String,
+    pub plural: String,
+    pub singular: String,
+    pub scope: String, // Namespaced or Cluster
+    pub age: String,
+    pub categories: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomResourceInfo {
+    pub name: String,
+    pub namespace: Option<String>,
+    pub kind: String,
+    pub api_version: String,
+    pub age: String,
+    pub metadata: serde_json::Value,
+}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Sidebar } from "./components/Sidebar";
+import { ClusterSelector } from "./components/ClusterSelector";
 import { NamespaceSelector } from "./components/NamespaceSelector";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { CommandPalette } from "./components/CommandPalette";
@@ -8,8 +9,7 @@ import { Dashboard } from "./features/dashboard/Dashboard";
 import { PodsList } from "./features/pods/PodsList";
 import { DeploymentsList } from "./features/deployments/DeploymentsList";
 import { ServicesList } from "./features/services/ServicesList";
-import { IngressesList } from "./features/ingresses/IngressesList";
-import { IstioResourcesList } from "./features/ingresses/IstioResourcesList";
+import { GatewaysPage } from "./features/gateways/GatewaysPage";
 import { ConfigMapsList } from "./features/configmaps/ConfigMapsList";
 import { SecretsList } from "./features/secrets/SecretsList";
 import { WorkloadsList } from "./features/workloads/WorkloadsList";
@@ -18,6 +18,8 @@ import { RBACList } from "./features/rbac/RBACList";
 import { NodesList } from "./features/nodes/NodesList";
 import { EventsList } from "./features/events/EventsList";
 import { PortForwardsPage } from "./features/portforwards/PortForwardsPage";
+import { CRDsList } from "./features/crds/CRDsList";
+import { ControllerPage } from "./features/controllers/ControllerPage";
 import { useAppStore } from "./lib/store";
 
 const queryClient = new QueryClient({
@@ -54,10 +56,8 @@ function MainContent() {
 
       <header className="border-b border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between shadow-sm sticky top-0 z-40">
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
-            <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wide">Namespace</h2>
-          </div>
+          <ClusterSelector />
+          <div className="h-8 w-px bg-border/50"></div>
           <NamespaceSelector />
         </div>
         <div className="flex items-center gap-3">
@@ -79,8 +79,7 @@ function MainContent() {
         {currentView === "pods" && <PodsList />}
         {currentView === "deployments" && <DeploymentsList />}
         {currentView === "services" && <ServicesList />}
-        {currentView === "ingresses" && <IngressesList />}
-        {currentView === "istio" && <IstioResourcesList />}
+        {currentView === "gateways" && <GatewaysPage />}
         {currentView === "configmaps" && <ConfigMapsList />}
         {currentView === "secrets" && <SecretsList />}
         {currentView === "statefulsets" && <WorkloadsList />}
@@ -92,6 +91,15 @@ function MainContent() {
         {currentView === "nodes" && <NodesList />}
         {currentView === "events" && <EventsList />}
         {currentView === "portforwards" && <PortForwardsPage />}
+        {currentView === "crds" && <CRDsList />}
+        {currentView === "argocd" && <ControllerPage controllerId="argocd" />}
+        {currentView === "flux" && <ControllerPage controllerId="flux" />}
+        {currentView === "external-secrets" && <ControllerPage controllerId="external-secrets" />}
+        {currentView === "sealed-secrets" && <ControllerPage controllerId="sealed-secrets" />}
+        {currentView === "cert-manager" && <ControllerPage controllerId="cert-manager" />}
+        {currentView === "crossplane" && <ControllerPage controllerId="crossplane" />}
+        {currentView === "argo-workflows" && <ControllerPage controllerId="argo-workflows" />}
+        {currentView === "argo-events" && <ControllerPage controllerId="argo-events" />}
         {currentView === "namespaces" && (
           <div className="p-8 text-center text-muted-foreground">
             Namespaces view coming soon...

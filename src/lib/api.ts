@@ -411,4 +411,9 @@ export const api = {
   async listPortForwards(): Promise<PortForwardInfo[]> {
     return await invoke("list_port_forwards");
   },
+
+  // CRD operations
+  async getCRDs(): Promise<any[]> {
+    return await invoke("get_crds");
+  },
 };

@@ -6,7 +6,7 @@ export function Logo({ size = "default" }: { size?: "default" | "small" }) {
     <div className="flex items-center gap-3">
       <div className={`${dimensions} relative group`}>
         {/* Animated gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-xl opacity-90 group-hover:opacity-100 transition-opacity duration-300 animate-pulse"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-500 via-zinc-500 to-slate-600 rounded-xl opacity-90 group-hover:opacity-100 transition-opacity duration-300 animate-pulse"></div>
 
         {/* Icon container */}
         <div className="relative h-full flex items-center justify-center">
@@ -48,7 +48,7 @@ export function Logo({ size = "default" }: { size?: "default" | "small" }) {
 
       {size === "default" && (
         <div className="flex flex-col">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-400 via-zinc-400 to-slate-500 bg-clip-text text-transparent">
             KubeSail
           </h1>
           <p className="text-[10px] text-muted-foreground font-medium tracking-wide">

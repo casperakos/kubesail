@@ -1,6 +1,7 @@
 use crate::kube::{get_current_context, load_kubeconfig, KubeClientManager};
+use crate::shell::ShellManager;
 use crate::types::*;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 #[tauri::command]
 pub async fn get_kubeconfig_contexts(
@@ -246,6 +247,50 @@ pub async fn reinit_kube_client(
         .reinit_client()
         .await
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn switch_kube_context(
+    context_name: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    crate::kube::switch_context(&context_name)
+        .map_err(|e| e.to_string())?;
+
+    client_manager
+        .reinit_client()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn load_custom_kubeconfig_file(
+    path: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<(), String> {
+    crate::kube::set_kubeconfig_path(&path)
+        .map_err(|e| e.to_string())?;
+
+    client_manager
+        .reinit_client()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_current_context_info() -> Result<Option<ContextInfo>, String> {
+    let config = crate::kube::load_kubeconfig()
+        .map_err(|e| e.to_string())?;
+
+    let current = crate::kube::get_current_context(&config);
+
+    Ok(current.map(|ctx| ContextInfo {
+        name: ctx.name.clone(),
+        cluster: ctx.context.cluster.clone(),
+        namespace: ctx.context.namespace.clone(),
+        user: ctx.context.user.clone(),
+        current: true,
+    }))
 }
 
 #[tauri::command]
@@ -822,4 +867,198 @@ pub async fn describe_resource(
     )
     .await
     .map_err(|e| e.to_string())
+}
+
+// Shell commands
+#[tauri::command]
+pub async fn start_shell_session(
+    app: AppHandle,
+    pod_name: String,
+    namespace: String,
+    container: Option<String>,
+    shell: Option<String>,
+    client_manager: State<'_, KubeClientManager>,
+    shell_manager: State<'_, ShellManager>,
+) -> Result<String, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    shell_manager
+        .start_session(app, client, pod_name, namespace, container, shell)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn send_shell_input(
+    session_id: String,
+    data: String,
+    shell_manager: State<'_, ShellManager>,
+) -> Result<(), String> {
+    shell_manager
+        .send_input(&session_id, data)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn close_shell_session(
+    session_id: String,
+    shell_manager: State<'_, ShellManager>,
+) -> Result<(), String> {
+    shell_manager
+        .close_session(&session_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_pod_containers(
+    pod_name: String,
+    namespace: String,
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<String>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::get_pod_containers(client, &namespace, &pod_name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// CRD Commands
+#[tauri::command]
+pub async fn get_crds(
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<Vec<CRDInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_crds(client)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_custom_resources(
+    client_manager: State<'_, KubeClientManager>,
+    group: String,
+    version: String,
+    plural: String,
+    namespace: Option<String>,
+) -> Result<Vec<CustomResourceInfo>, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::list_custom_resources(
+        client,
+        &group,
+        &version,
+        &plural,
+        namespace.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn delete_custom_resource(
+    client_manager: State<'_, KubeClientManager>,
+    group: String,
+    version: String,
+    plural: String,
+    name: String,
+    namespace: Option<String>,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::delete_custom_resource(
+        client,
+        &group,
+        &version,
+        &plural,
+        &name,
+        namespace.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_custom_resource_yaml(
+    client_manager: State<'_, KubeClientManager>,
+    group: String,
+    version: String,
+    plural: String,
+    name: String,
+    namespace: Option<String>,
+) -> Result<String, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::get_custom_resource_yaml(
+        client,
+        &group,
+        &version,
+        &plural,
+        &name,
+        namespace.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn describe_custom_resource(
+    client_manager: State<'_, KubeClientManager>,
+    group: String,
+    version: String,
+    plural: String,
+    name: String,
+    namespace: Option<String>,
+) -> Result<String, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::describe_custom_resource(
+        client,
+        &group,
+        &version,
+        &plural,
+        &name,
+        namespace.as_deref(),
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn sync_argocd_app(
+    client_manager: State<'_, KubeClientManager>,
+    name: String,
+    namespace: String,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::sync_argocd_app(client, &name, &namespace)
+        .await
+        .map_err(|e| e.to_string())
 }

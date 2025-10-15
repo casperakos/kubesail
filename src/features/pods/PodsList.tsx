@@ -11,11 +11,12 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { Trash2, RefreshCw, FileText, Code, Search, X, ArrowRightLeft, ScrollText } from "lucide-react";
+import { Trash2, RefreshCw, FileText, Code, Search, X, ArrowRightLeft, ScrollText, Terminal } from "lucide-react";
 import { LogsViewer } from "../logs/LogsViewer";
 import { YamlViewer } from "../../components/YamlViewer";
 import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
 import { PortForwardModal } from "../../components/PortForwardModal";
+import { ShellTerminal } from "../../components/ShellTerminal";
 
 export function PodsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
@@ -36,6 +37,9 @@ export function PodsList() {
     namespace: string;
     ports: number[];
   } | null>(null);
+  const [selectedPodForShell, setSelectedPodForShell] = useState<{name: string; namespace: string} | null>(
+    null
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [podToDelete, setPodToDelete] = useState<string | null>(null);
   const [selectedPods, setSelectedPods] = useState<Set<string>>(new Set());
@@ -191,7 +195,7 @@ export function PodsList() {
       <div className="p-6 rounded-xl border border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl shadow-lg space-y-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+            <div className="w-1 h-8 bg-gradient-to-b from-slate-500 to-zinc-500 rounded-full"></div>
             <h2 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
               Pods
             </h2>
@@ -344,6 +348,14 @@ export function PodsList() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    onClick={() => setSelectedPodForShell({name: pod.name, namespace: pod.namespace})}
+                    title="Shell access"
+                  >
+                    <Terminal className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => handleDelete(pod.name)}
                     disabled={deletePod.isPending}
                     title="Delete pod"
@@ -391,6 +403,14 @@ export function PodsList() {
           namespace={selectedPodForPortForward.namespace}
           availablePorts={selectedPodForPortForward.ports}
           onClose={() => setSelectedPodForPortForward(null)}
+        />
+      )}
+
+      {selectedPodForShell && (
+        <ShellTerminal
+          podName={selectedPodForShell.name}
+          namespace={selectedPodForShell.namespace}
+          onClose={() => setSelectedPodForShell(null)}
         />
       )}
 

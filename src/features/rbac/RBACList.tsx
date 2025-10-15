@@ -17,8 +17,9 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, Code } from "lucide-react";
+import { RefreshCw, Search, X, Code, FileText } from "lucide-react";
 import { YamlViewer } from "../../components/YamlViewer";
+import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
 import type {
   RoleInfo,
   RoleBindingInfo,
@@ -35,6 +36,7 @@ export function RBACList() {
   const [activeTab, setActiveTab] = useState<RBACType>("roles");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedResource, setSelectedResource] = useState<{name: string; namespace?: string} | null>(null);
+  const [selectedResourceForDescribe, setSelectedResourceForDescribe] = useState<{name: string; namespace?: string} | null>(null);
 
   const { data: roles, isLoading: rolesLoading, error: rolesError, refetch: rolesRefetch } =
     useRoles(currentNamespace);
@@ -156,7 +158,7 @@ export function RBACList() {
       <div className="p-6 rounded-xl border border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl shadow-lg space-y-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
+            <div className="w-1 h-8 bg-gradient-to-b from-slate-500 to-zinc-500 rounded-full"></div>
             <h2 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
               RBAC
             </h2>
@@ -218,6 +220,7 @@ export function RBACList() {
           error={rolesError}
           searchQuery={searchQuery}
           onViewYaml={setSelectedResource}
+          onDescribe={setSelectedResourceForDescribe}
         />
       )}
       {activeTab === "rolebindings" && (
@@ -227,6 +230,7 @@ export function RBACList() {
           error={roleBindingsError}
           searchQuery={searchQuery}
           onViewYaml={setSelectedResource}
+          onDescribe={setSelectedResourceForDescribe}
         />
       )}
       {activeTab === "clusterroles" && (
@@ -236,6 +240,7 @@ export function RBACList() {
           error={clusterRolesError}
           searchQuery={searchQuery}
           onViewYaml={setSelectedResource}
+          onDescribe={setSelectedResourceForDescribe}
         />
       )}
       {activeTab === "clusterrolebindings" && (
@@ -245,6 +250,7 @@ export function RBACList() {
           error={clusterRoleBindingsError}
           searchQuery={searchQuery}
           onViewYaml={setSelectedResource}
+          onDescribe={setSelectedResourceForDescribe}
         />
       )}
       {activeTab === "serviceaccounts" && (
@@ -254,6 +260,7 @@ export function RBACList() {
           error={serviceAccountsError}
           searchQuery={searchQuery}
           onViewYaml={setSelectedResource}
+          onDescribe={setSelectedResourceForDescribe}
         />
       )}
 
@@ -265,11 +272,20 @@ export function RBACList() {
           onClose={() => setSelectedResource(null)}
         />
       )}
+
+      {selectedResourceForDescribe && (
+        <ResourceDescribeViewer
+          resourceType={getResourceType()}
+          name={selectedResourceForDescribe.name}
+          namespace={selectedResourceForDescribe.namespace}
+          onClose={() => setSelectedResourceForDescribe(null)}
+        />
+      )}
     </div>
   );
 }
 
-function RolesTable({ data, isLoading, error, searchQuery, onViewYaml }: { data: RoleInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void }) {
+function RolesTable({ data, isLoading, error, searchQuery, onViewYaml, onDescribe }: { data: RoleInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void; onDescribe: (name: string) => void }) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const showNamespaceColumn = !currentNamespace;
 
@@ -319,13 +335,24 @@ function RolesTable({ data, isLoading, error, searchQuery, onViewYaml }: { data:
               </TableCell>
               <TableCell>{role.age}</TableCell>
               <TableCell className="text-right">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onViewYaml({name: role.name, namespace: role.namespace})}
-                >
-                  <Code className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onViewYaml({name: role.name, namespace: role.namespace})}
+                    title="View YAML"
+                  >
+                    <Code className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onDescribe({name: role.name, namespace: role.namespace})}
+                    title="Describe"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))
@@ -335,7 +362,7 @@ function RolesTable({ data, isLoading, error, searchQuery, onViewYaml }: { data:
   );
 }
 
-function RoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml }: { data: RoleBindingInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void }) {
+function RoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml, onDescribe }: { data: RoleBindingInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void; onDescribe: (name: string) => void }) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const showNamespaceColumn = !currentNamespace;
 
@@ -398,13 +425,24 @@ function RoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
               </TableCell>
               <TableCell>{rb.age}</TableCell>
               <TableCell className="text-right">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onViewYaml({name: rb.name, namespace: rb.namespace})}
-                >
-                  <Code className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onViewYaml({name: rb.name, namespace: rb.namespace})}
+                    title="View YAML"
+                  >
+                    <Code className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onDescribe({name: rb.name, namespace: rb.namespace})}
+                    title="Describe"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))
@@ -414,7 +452,7 @@ function RoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
   );
 }
 
-function ClusterRolesTable({ data, isLoading, error, searchQuery, onViewYaml }: { data: ClusterRoleInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void }) {
+function ClusterRolesTable({ data, isLoading, error, searchQuery, onViewYaml, onDescribe }: { data: ClusterRoleInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void; onDescribe: (name: string) => void }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -457,13 +495,24 @@ function ClusterRolesTable({ data, isLoading, error, searchQuery, onViewYaml }: 
               </TableCell>
               <TableCell>{cr.age}</TableCell>
               <TableCell className="text-right">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onViewYaml({name: cr.name})}
-                >
-                  <Code className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onViewYaml({name: cr.name})}
+                    title="View YAML"
+                  >
+                    <Code className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onDescribe({name: cr.name})}
+                    title="Describe"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))
@@ -473,7 +522,7 @@ function ClusterRolesTable({ data, isLoading, error, searchQuery, onViewYaml }: 
   );
 }
 
-function ClusterRoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml }: { data: ClusterRoleBindingInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void }) {
+function ClusterRoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml, onDescribe }: { data: ClusterRoleBindingInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void; onDescribe: (name: string) => void }) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -526,13 +575,24 @@ function ClusterRoleBindingsTable({ data, isLoading, error, searchQuery, onViewY
               </TableCell>
               <TableCell>{crb.age}</TableCell>
               <TableCell className="text-right">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onViewYaml({name: crb.name})}
-                >
-                  <Code className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onViewYaml({name: crb.name})}
+                    title="View YAML"
+                  >
+                    <Code className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onDescribe({name: crb.name})}
+                    title="Describe"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))
@@ -542,7 +602,7 @@ function ClusterRoleBindingsTable({ data, isLoading, error, searchQuery, onViewY
   );
 }
 
-function ServiceAccountsTable({ data, isLoading, error, searchQuery, onViewYaml }: { data: ServiceAccountInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void }) {
+function ServiceAccountsTable({ data, isLoading, error, searchQuery, onViewYaml, onDescribe }: { data: ServiceAccountInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void; onDescribe: (name: string) => void }) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const showNamespaceColumn = !currentNamespace;
 
@@ -592,13 +652,24 @@ function ServiceAccountsTable({ data, isLoading, error, searchQuery, onViewYaml 
               </TableCell>
               <TableCell>{sa.age}</TableCell>
               <TableCell className="text-right">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onViewYaml({name: sa.name, namespace: sa.namespace})}
-                >
-                  <Code className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center justify-end gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onViewYaml({name: sa.name, namespace: sa.namespace})}
+                    title="View YAML"
+                  >
+                    <Code className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onDescribe({name: sa.name, namespace: sa.namespace})}
+                    title="Describe"
+                  >
+                    <FileText className="w-4 h-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))
