@@ -192,8 +192,17 @@ pub struct NodeInfo {
     pub age: String,
     pub version: String,
     pub internal_ip: String,
+    pub external_ip: Option<String>,
     pub os_image: String,
     pub kernel_version: String,
+    pub container_runtime: String,
+    pub cpu_capacity: String,
+    pub cpu_allocatable: String,
+    pub memory_capacity: String,
+    pub memory_allocatable: String,
+    pub pods_capacity: String,
+    pub pods_allocatable: String,
+    pub gpu_capacity: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1274,6 +1274,64 @@ pub async fn list_nodes(client: Client) -> Result<Vec<NodeInfo>> {
             .map(|ni| ni.kernel_version.clone())
             .unwrap_or_else(|| "Unknown".to_string());
 
+        let external_ip = node
+            .status
+            .as_ref()
+            .and_then(|s| s.addresses.as_ref())
+            .and_then(|addresses| {
+                addresses
+                    .iter()
+                    .find(|a| a.type_ == "ExternalIP")
+                    .map(|a| a.address.clone())
+            });
+
+        let container_runtime = node
+            .status
+            .as_ref()
+            .and_then(|s| s.node_info.as_ref())
+            .map(|ni| ni.container_runtime_version.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let capacity = node.status.as_ref().and_then(|s| s.capacity.as_ref());
+        let allocatable = node.status.as_ref().and_then(|s| s.allocatable.as_ref());
+
+        let cpu_capacity = capacity
+            .and_then(|c| c.get("cpu"))
+            .map(|q| q.0.clone())
+            .unwrap_or_else(|| "0".to_string());
+
+        let cpu_allocatable = allocatable
+            .and_then(|a| a.get("cpu"))
+            .map(|q| q.0.clone())
+            .unwrap_or_else(|| "0".to_string());
+
+        let memory_capacity = capacity
+            .and_then(|c| c.get("memory"))
+            .map(|q| q.0.clone())
+            .unwrap_or_else(|| "0".to_string());
+
+        let memory_allocatable = allocatable
+            .and_then(|a| a.get("memory"))
+            .map(|q| q.0.clone())
+            .unwrap_or_else(|| "0".to_string());
+
+        let pods_capacity = capacity
+            .and_then(|c| c.get("pods"))
+            .map(|q| q.0.clone())
+            .unwrap_or_else(|| "0".to_string());
+
+        let pods_allocatable = allocatable
+            .and_then(|a| a.get("pods"))
+            .map(|q| q.0.clone())
+            .unwrap_or_else(|| "0".to_string());
+
+        // Check for GPU capacity (nvidia.com/gpu or amd.com/gpu)
+        let gpu_capacity = capacity.and_then(|c| {
+            c.get("nvidia.com/gpu")
+                .or_else(|| c.get("amd.com/gpu"))
+                .map(|q| q.0.clone())
+        });
+
         let age = node
             .metadata
             .creation_timestamp
@@ -1288,8 +1346,17 @@ pub async fn list_nodes(client: Client) -> Result<Vec<NodeInfo>> {
             age,
             version,
             internal_ip,
+            external_ip,
             os_image,
             kernel_version,
+            container_runtime,
+            cpu_capacity,
+            cpu_allocatable,
+            memory_capacity,
+            memory_allocatable,
+            pods_capacity,
+            pods_allocatable,
+            gpu_capacity,
         });
     }
 

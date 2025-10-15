@@ -1,16 +1,102 @@
 import { useState, useMemo } from "react";
 import { useNodes } from "../../hooks/useKube";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X } from "lucide-react";
+import { RefreshCw, Search, X, Cpu, MemoryStick, Server, HardDrive, Box, Activity } from "lucide-react";
+
+// Utility functions to parse and format resources
+const parseMemory = (mem: string): number => {
+  // Convert memory to GB
+  if (mem.endsWith("Ki")) {
+    return parseInt(mem.slice(0, -2)) / (1024 * 1024);
+  } else if (mem.endsWith("Mi")) {
+    return parseInt(mem.slice(0, -2)) / 1024;
+  } else if (mem.endsWith("Gi")) {
+    return parseInt(mem.slice(0, -2));
+  } else if (mem.endsWith("Ti")) {
+    return parseInt(mem.slice(0, -2)) * 1024;
+  }
+  return parseInt(mem) / (1024 * 1024 * 1024);
+};
+
+const formatMemory = (mem: string): string => {
+  const gb = parseMemory(mem);
+  if (gb >= 1000) {
+    return `${(gb / 1024).toFixed(1)} TB`;
+  }
+  return `${gb.toFixed(1)} GB`;
+};
+
+const parseCPU = (cpu: string): number => {
+  // Convert CPU to cores
+  if (cpu.endsWith("m")) {
+    return parseInt(cpu.slice(0, -1)) / 1000;
+  }
+  return parseInt(cpu);
+};
+
+const formatCPU = (cpu: string): string => {
+  const cores = parseCPU(cpu);
+  if (cores < 1) {
+    return `${(cores * 1000).toFixed(0)}m`;
+  }
+  return `${cores.toFixed(1)} cores`;
+};
+
+const calculatePercentage = (allocatable: string, capacity: string, isMemory: boolean = false): number => {
+  if (isMemory) {
+    const alloc = parseMemory(allocatable);
+    const cap = parseMemory(capacity);
+    return cap > 0 ? (alloc / cap) * 100 : 0;
+  } else {
+    const alloc = parseCPU(allocatable);
+    const cap = parseCPU(capacity);
+    return cap > 0 ? (alloc / cap) * 100 : 0;
+  }
+};
+
+interface ResourceBarProps {
+  label: string;
+  allocatable: string;
+  capacity: string;
+  isMemory?: boolean;
+  icon: React.ReactNode;
+}
+
+function ResourceBar({ label, allocatable, capacity, isMemory = false, icon }: ResourceBarProps) {
+  const percentage = calculatePercentage(allocatable, capacity, isMemory);
+  const allocatableFormatted = isMemory ? formatMemory(allocatable) : formatCPU(allocatable);
+  const capacityFormatted = isMemory ? formatMemory(capacity) : formatCPU(capacity);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          {icon}
+          <span>{label}</span>
+        </div>
+        <span className="font-mono text-xs">
+          {allocatableFormatted} / {capacityFormatted}
+        </span>
+      </div>
+      <div className="relative h-2 bg-muted/50 rounded-full overflow-hidden">
+        <div
+          className={`absolute left-0 top-0 h-full rounded-full transition-all ${
+            percentage > 90
+              ? "bg-gradient-to-r from-green-500 to-emerald-500"
+              : percentage > 70
+              ? "bg-gradient-to-r from-blue-500 to-cyan-500"
+              : "bg-gradient-to-r from-blue-500 to-purple-500"
+          }`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      <div className="text-xs text-muted-foreground text-right">
+        {percentage.toFixed(1)}% allocatable
+      </div>
+    </div>
+  );
+}
 
 export function NodesList() {
   const { data: nodes, isLoading, error, refetch } = useNodes();
@@ -28,55 +114,70 @@ export function NodesList() {
     if (!searchQuery) return nodes;
 
     const query = searchQuery.toLowerCase();
-    return nodes.filter(node =>
-      node.name.toLowerCase().includes(query) ||
-      node.status.toLowerCase().includes(query) ||
-      node.version.toLowerCase().includes(query) ||
-      node.internal_ip.toLowerCase().includes(query) ||
-      node.roles.some(role => role.toLowerCase().includes(query))
+    return nodes.filter(
+      (node) =>
+        node.name.toLowerCase().includes(query) ||
+        node.status.toLowerCase().includes(query) ||
+        node.version.toLowerCase().includes(query) ||
+        node.internal_ip.toLowerCase().includes(query) ||
+        node.roles.some((role) => role.toLowerCase().includes(query))
     );
   }, [nodes, searchQuery]);
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
+      <div className="flex items-center justify-center h-64 animate-fade-in">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
+            <div
+              className="absolute inset-0 w-12 h-12 rounded-full border-4 border-transparent border-t-purple-500 animate-spin"
+              style={{ animationDirection: "reverse", animationDuration: "1.5s" }}
+            ></div>
+          </div>
+          <p className="text-sm text-muted-foreground font-medium">Loading nodes...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-4 text-destructive">
-        Error loading nodes: {error.message}
+      <div className="p-8 rounded-xl border border-destructive/50 bg-gradient-to-br from-destructive/10 to-destructive/5 backdrop-blur-sm animate-fade-in">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="w-12 h-12 rounded-full bg-destructive/20 flex items-center justify-center">
+            <RefreshCw className="w-6 h-6 text-destructive" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-destructive mb-1">Error loading nodes</h3>
+            <p className="text-sm text-muted-foreground">{error.message}</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Header */}
       <div className="p-6 rounded-xl border border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl shadow-lg space-y-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
             <h2 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
-              Nodes
+              Cluster Nodes
             </h2>
             <Badge variant="secondary" className="ml-2">
               {filteredNodes?.length || 0} {searchQuery && `of ${nodes?.length || 0}`}
             </Badge>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            disabled={isLoading}
-          >
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
         </div>
 
+        {/* Search Bar */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
@@ -97,55 +198,120 @@ export function NodesList() {
         </div>
       </div>
 
+      {/* Nodes List */}
       {!filteredNodes || filteredNodes.length === 0 ? (
         <div className="p-12 text-center rounded-xl border border-border/50 bg-gradient-to-br from-muted/30 to-muted/10 backdrop-blur-sm">
-          <p className="text-muted-foreground">
-            {searchQuery ? `No nodes found matching "${searchQuery}"` : "No nodes found in cluster"}
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {filteredNodes.map((node) => (
-          <div
-            key={node.name}
-            className="border border-border rounded-lg p-4 hover:border-primary/50 transition-colors"
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h3 className="text-lg font-semibold">{node.name}</h3>
-                <div className="flex gap-2 mt-2">
-                  <Badge variant={getStatusVariant(node.status)}>
-                    {node.status}
-                  </Badge>
-                  {node.roles.map((role) => (
-                    <Badge key={role} variant="secondary">
-                      {role}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              <span className="text-sm text-muted-foreground">{node.age}</span>
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center">
+              <Server className="w-8 h-8 text-muted-foreground" />
             </div>
-
-            <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-border">
-              <div>
-                <p className="text-sm text-muted-foreground">Kubelet Version</p>
-                <p className="text-sm font-mono">{node.version}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Internal IP</p>
-                <p className="text-sm font-mono">{node.internal_ip}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">OS Image</p>
-                <p className="text-sm">{node.os_image}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Kernel Version</p>
-                <p className="text-sm font-mono">{node.kernel_version}</p>
-              </div>
+            <div>
+              <h3 className="font-semibold text-foreground mb-1">No nodes found</h3>
+              <p className="text-sm text-muted-foreground">
+                {searchQuery ? `No nodes found matching "${searchQuery}"` : "No nodes found in cluster"}
+              </p>
             </div>
           </div>
+        </div>
+      ) : (
+        <div className="grid gap-6">
+          {filteredNodes.map((node) => (
+            <div
+              key={node.name}
+              className="border border-border/50 rounded-xl p-6 bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm hover:border-primary/50 hover:shadow-lg transition-all"
+            >
+              {/* Node Header */}
+              <div className="flex items-start justify-between mb-6 pb-4 border-b border-border/50">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Server className="w-5 h-5 text-primary" />
+                    <h3 className="text-xl font-bold">{node.name}</h3>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant={getStatusVariant(node.status)}>{node.status}</Badge>
+                    {node.roles.length > 0 ? (
+                      node.roles.map((role) => (
+                        <Badge key={role} variant="secondary">
+                          {role}
+                        </Badge>
+                      ))
+                    ) : (
+                      <Badge variant="outline">worker</Badge>
+                    )}
+                    {node.gpu_capacity && (
+                      <Badge variant="default" className="bg-gradient-to-r from-green-500 to-emerald-500">
+                        GPU x{node.gpu_capacity}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground">Age</p>
+                  <p className="text-sm font-medium">{node.age}</p>
+                </div>
+              </div>
+
+              {/* Resource Metrics */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <ResourceBar
+                  label="CPU"
+                  allocatable={node.cpu_allocatable}
+                  capacity={node.cpu_capacity}
+                  icon={<Cpu className="w-4 h-4" />}
+                />
+                <ResourceBar
+                  label="Memory"
+                  allocatable={node.memory_allocatable}
+                  capacity={node.memory_capacity}
+                  isMemory={true}
+                  icon={<MemoryStick className="w-4 h-4" />}
+                />
+              </div>
+
+              {/* Additional Info Grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-lg bg-muted/30">
+                <div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                    <Box className="w-3 h-3" />
+                    <span>Pods</span>
+                  </div>
+                  <p className="text-sm font-mono">{node.pods_allocatable} / {node.pods_capacity}</p>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                    <Activity className="w-3 h-3" />
+                    <span>Version</span>
+                  </div>
+                  <p className="text-sm font-mono">{node.version}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Internal IP</p>
+                  <p className="text-sm font-mono">{node.internal_ip}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">External IP</p>
+                  <p className="text-sm font-mono">{node.external_ip || "N/A"}</p>
+                </div>
+              </div>
+
+              {/* System Info */}
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">OS Image</p>
+                    <p className="font-medium">{node.os_image}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Kernel</p>
+                    <p className="font-mono text-xs">{node.kernel_version}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Container Runtime</p>
+                    <p className="font-mono text-xs">{node.container_runtime}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       )}

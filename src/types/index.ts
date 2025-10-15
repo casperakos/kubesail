@@ -150,8 +150,17 @@ export interface NodeInfo {
   age: string;
   version: string;
   internal_ip: string;
+  external_ip?: string;
   os_image: string;
   kernel_version: string;
+  container_runtime: string;
+  cpu_capacity: string;
+  cpu_allocatable: string;
+  memory_capacity: string;
+  memory_allocatable: string;
+  pods_capacity: string;
+  pods_allocatable: string;
+  gpu_capacity?: string;
 }
 
 export interface EventInfo {
