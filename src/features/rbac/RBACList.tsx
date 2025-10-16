@@ -20,6 +20,7 @@ import { Button } from "../../components/ui/Button";
 import { RefreshCw, Search, X, Code, FileText } from "lucide-react";
 import { YamlViewer } from "../../components/YamlViewer";
 import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 import type {
   RoleInfo,
   RoleBindingInfo,
@@ -290,11 +291,7 @@ function RolesTable({ data, isLoading, error, searchQuery, onViewYaml, onDescrib
   const showNamespaceColumn = !currentNamespace;
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner message="Loading roles..." />;
   }
 
   if (error) {
@@ -367,11 +364,7 @@ function RoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml, on
   const showNamespaceColumn = !currentNamespace;
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner message="Loading role bindings..." />;
   }
 
   if (error) {
@@ -454,11 +447,7 @@ function RoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml, on
 
 function ClusterRolesTable({ data, isLoading, error, searchQuery, onViewYaml, onDescribe }: { data: ClusterRoleInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void; onDescribe: (name: string) => void }) {
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner message="Loading cluster roles..." />;
   }
 
   if (error) {
@@ -524,11 +513,7 @@ function ClusterRolesTable({ data, isLoading, error, searchQuery, onViewYaml, on
 
 function ClusterRoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml, onDescribe }: { data: ClusterRoleBindingInfo[]; isLoading: boolean; error: any; searchQuery: string; onViewYaml: (name: string) => void; onDescribe: (name: string) => void }) {
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner message="Loading cluster role bindings..." />;
   }
 
   if (error) {
@@ -607,11 +592,7 @@ function ServiceAccountsTable({ data, isLoading, error, searchQuery, onViewYaml,
   const showNamespaceColumn = !currentNamespace;
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner message="Loading service accounts..." />;
   }
 
   if (error) {

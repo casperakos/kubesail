@@ -215,6 +215,7 @@ export type ResourceType =
   | "rbac"
   | "portforwards"
   | "crds"
+  | "helm"
   | "argocd"
   | "flux"
   | "external-secrets"
@@ -299,4 +300,46 @@ export interface AppState {
   setCurrentView: (view: ResourceType) => void;
   setTheme: (theme: "light" | "dark") => void;
   toggleTheme: () => void;
+}
+
+// Helm types
+export interface HelmRelease {
+  name: string;
+  namespace: string;
+  revision: string;
+  updated: string;
+  status: string;
+  chart: string;
+  app_version: string;
+}
+
+export interface HelmReleaseDetail {
+  name: string;
+  info: HelmReleaseInfo;
+  chart: HelmChart;
+  config: Record<string, any>;
+}
+
+export interface HelmReleaseInfo {
+  first_deployed: string;
+  last_deployed: string;
+  deleted: string;
+  description: string;
+  status: string;
+  notes: string;
+}
+
+export interface HelmChart {
+  metadata: HelmChartMetadata;
+}
+
+export interface HelmChartMetadata {
+  name: string;
+  version: string;
+  description?: string;
+  api_version: string;
+  app_version?: string;
+  keywords?: string[];
+  home?: string;
+  sources?: string[];
 }

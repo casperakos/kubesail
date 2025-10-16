@@ -23,13 +23,19 @@ import {
   GitBranch,
   GitCommit,
   Zap,
-  Info
+  Info,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Calendar,
+  Filter
 } from "lucide-react";
 import { useAppStore } from "../../lib/store";
 import { useController } from "../../hooks/useControllerDetection";
 import { CustomResourceDescribeViewer } from "../../components/CustomResourceDescribeViewer";
 import { CustomResourceYamlViewer } from "../../components/CustomResourceYamlViewer";
 import { WorkflowDAGViewer } from "../../components/WorkflowDAGViewer";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 
 interface CRD {
   name: string;
@@ -457,6 +463,12 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
   const [resourcesError, setResourcesError] = useState<string | null>(null);
   const [resourceSearchQuery, setResourceSearchQuery] = useState("");
 
+  // For sorting and filtering
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc" | null>("desc"); // Default to newest first
+  const [dateFilterStart, setDateFilterStart] = useState<string>("");
+  const [dateFilterEnd, setDateFilterEnd] = useState<string>("");
+  const [showDateFilter, setShowDateFilter] = useState(false);
+
   // For modals
   const [describeResource, setDescribeResource] = useState<CustomResource | null>(null);
   const [yamlResource, setYamlResource] = useState<CustomResource | null>(null);
@@ -474,19 +486,92 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
   }, [controller]);
 
   useEffect(() => {
-    if (resourceSearchQuery.trim() === "") {
-      setFilteredResources(resources);
-    } else {
+    let filtered = [...resources];
+
+    // Apply search filter
+    if (resourceSearchQuery.trim() !== "") {
       const query = resourceSearchQuery.toLowerCase();
-      setFilteredResources(
-        resources.filter(
-          (resource) =>
-            resource.name.toLowerCase().includes(query) ||
-            (resource.namespace && resource.namespace.toLowerCase().includes(query))
-        )
+      filtered = filtered.filter(
+        (resource) =>
+          resource.name.toLowerCase().includes(query) ||
+          (resource.namespace && resource.namespace.toLowerCase().includes(query))
       );
     }
-  }, [resourceSearchQuery, resources]);
+
+    // Apply date filter
+    if (dateFilterStart || dateFilterEnd) {
+      filtered = filtered.filter((resource) => {
+        // Parse the age string to get a timestamp
+        const ageTimestamp = parseAgeToTimestamp(resource.age);
+        if (!ageTimestamp) return true; // Keep if we can't parse
+
+        const resourceDate = new Date(ageTimestamp);
+
+        if (dateFilterStart && !dateFilterEnd) {
+          return resourceDate >= new Date(dateFilterStart);
+        } else if (!dateFilterStart && dateFilterEnd) {
+          return resourceDate <= new Date(dateFilterEnd + 'T23:59:59');
+        } else if (dateFilterStart && dateFilterEnd) {
+          return (
+            resourceDate >= new Date(dateFilterStart) &&
+            resourceDate <= new Date(dateFilterEnd + 'T23:59:59')
+          );
+        }
+        return true;
+      });
+    }
+
+    // Apply sorting by age
+    if (sortOrder) {
+      filtered.sort((a, b) => {
+        const aTime = parseAgeToTimestamp(a.age);
+        const bTime = parseAgeToTimestamp(b.age);
+
+        if (!aTime || !bTime) return 0;
+
+        if (sortOrder === "asc") {
+          return aTime - bTime; // Oldest first
+        } else {
+          return bTime - aTime; // Newest first
+        }
+      });
+    }
+
+    setFilteredResources(filtered);
+  }, [resourceSearchQuery, resources, sortOrder, dateFilterStart, dateFilterEnd]);
+
+  // Helper function to parse age string to timestamp
+  function parseAgeToTimestamp(age: string): number | null {
+    if (!age) return null;
+
+    const now = Date.now();
+    const parts = age.match(/(\d+)([smhd])/g);
+
+    if (!parts) return null;
+
+    let totalMs = 0;
+    for (const part of parts) {
+      const value = parseInt(part);
+      const unit = part.slice(-1);
+
+      switch (unit) {
+        case 's':
+          totalMs += value * 1000;
+          break;
+        case 'm':
+          totalMs += value * 60 * 1000;
+          break;
+        case 'h':
+          totalMs += value * 60 * 60 * 1000;
+          break;
+        case 'd':
+          totalMs += value * 24 * 60 * 60 * 1000;
+          break;
+      }
+    }
+
+    return now - totalMs;
+  }
 
   // Reload resources when namespace changes
   useEffect(() => {
@@ -645,6 +730,25 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
     setResources([]);
     setFilteredResources([]);
     setResourceSearchQuery("");
+    setSortOrder("desc"); // Reset to default
+    setDateFilterStart("");
+    setDateFilterEnd("");
+    setShowDateFilter(false);
+  }
+
+  function toggleSort() {
+    if (sortOrder === "desc") {
+      setSortOrder("asc"); // Oldest first
+    } else if (sortOrder === "asc") {
+      setSortOrder(null); // No sorting
+    } else {
+      setSortOrder("desc"); // Newest first (default)
+    }
+  }
+
+  function clearDateFilter() {
+    setDateFilterStart("");
+    setDateFilterEnd("");
   }
 
   if (!controller) {
@@ -659,11 +763,7 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
   // Show resources view for selected CRD
   if (selectedCRD) {
     if (resourcesLoading) {
-      return (
-        <div className="flex items-center justify-center h-full">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      );
+      return <LoadingSpinner message={`Loading ${selectedCRD.kind} resources...`} />;
     }
 
     if (resourcesError) {
@@ -714,11 +814,54 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
                 </button>
               )}
             </div>
+            <Button
+              onClick={() => setShowDateFilter(!showDateFilter)}
+              variant={dateFilterStart || dateFilterEnd ? "default" : "outline"}
+              size="sm"
+              title="Filter by date"
+            >
+              <Filter className="w-4 h-4" />
+            </Button>
             <Button onClick={() => loadCustomResources(selectedCRD)} variant="outline" size="sm">
               <RefreshCw className="w-4 h-4" />
             </Button>
           </div>
         </div>
+
+        {/* Date Filter */}
+        {showDateFilter && (
+          <div className="mb-4 p-4 bg-muted/30 rounded-xl border border-border/50">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-muted-foreground">From:</label>
+                <input
+                  type="date"
+                  value={dateFilterStart}
+                  onChange={(e) => setDateFilterStart(e.target.value)}
+                  className="px-3 py-1.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-muted-foreground">To:</label>
+                <input
+                  type="date"
+                  value={dateFilterEnd}
+                  onChange={(e) => setDateFilterEnd(e.target.value)}
+                  className="px-3 py-1.5 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+                />
+              </div>
+              {(dateFilterStart || dateFilterEnd) && (
+                <Button onClick={clearDateFilter} variant="ghost" size="sm">
+                  <X className="w-4 h-4 mr-1" />
+                  Clear
+                </Button>
+              )}
+              <div className="ml-auto text-xs text-muted-foreground">
+                Filter workflows by creation date
+              </div>
+            </div>
+          </div>
+        )}
 
         {filteredResources.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 p-12 rounded-xl border border-border/50 bg-gradient-to-br from-muted/30 to-muted/10">
@@ -787,7 +930,18 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
                         <TableHead>Triggers</TableHead>
                       </>
                     )}
-                    <TableHead>Age</TableHead>
+                    <TableHead>
+                      <button
+                        onClick={toggleSort}
+                        className="flex items-center gap-1 hover:text-foreground transition-colors"
+                        title="Click to sort by age"
+                      >
+                        Age
+                        {sortOrder === null && <ArrowUpDown className="w-4 h-4 text-muted-foreground" />}
+                        {sortOrder === "asc" && <ArrowUp className="w-4 h-4" />}
+                        {sortOrder === "desc" && <ArrowDown className="w-4 h-4" />}
+                      </button>
+                    </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1473,8 +1627,12 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
                 )}
                 </div>
               ) : (
-                <div className="flex-1 overflow-hidden">
-                  <WorkflowDAGViewer nodes={detailsResource.metadata?.status?.nodes || {}} />
+                <div className="flex-1 overflow-hidden" style={{ height: '600px', width: '100%' }}>
+                  <WorkflowDAGViewer
+                    nodes={detailsResource.metadata?.status?.nodes || {}}
+                    namespace={detailsResource.namespace}
+                    workflowName={detailsResource.name}
+                  />
                 </div>
               )}
 
@@ -2099,11 +2257,7 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
 
   // Show CRD types for this controller
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+    return <LoadingSpinner message={`Loading ${controller.name}...`} />;
   }
 
   if (error) {

@@ -11,6 +11,7 @@ import { Badge } from "../../components/ui/Badge";
 import { RefreshCw, Globe, Shield, Network, AlertCircle } from "lucide-react";
 import { IngressesList } from "../ingresses/IngressesList";
 import { IstioResourcesList } from "../ingresses/IstioResourcesList";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 
 type TabType = "nginx" | "traefik" | "standard" | "istio";
 
@@ -58,11 +59,7 @@ export function GatewaysPage() {
   };
 
   if (detectingOperators) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner message="Detecting gateways..." />;
   }
 
   if (!operators || operators.length === 0) {

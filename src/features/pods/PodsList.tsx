@@ -17,6 +17,7 @@ import { YamlViewer } from "../../components/YamlViewer";
 import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
 import { PortForwardModal } from "../../components/PortForwardModal";
 import { ShellTerminal } from "../../components/ShellTerminal";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 
 export function PodsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
@@ -142,17 +143,7 @@ export function PodsList() {
   }, [currentNamespace]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64 animate-fade-in">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
-            <div className="absolute inset-0 w-12 h-12 rounded-full border-4 border-transparent border-t-purple-500 animate-spin" style={{animationDirection: 'reverse', animationDuration: '1.5s'}}></div>
-          </div>
-          <p className="text-sm text-muted-foreground font-medium">Loading pods...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading pods..." />;
   }
 
   if (error) {
@@ -300,7 +291,16 @@ export function PodsList() {
                   {pod.status}
                 </Badge>
               </TableCell>
-              <TableCell>{pod.ready}</TableCell>
+              <TableCell>
+                {(() => {
+                  const [ready, total] = pod.ready.split("/").map(Number);
+                  return (
+                    <Badge variant={ready === total ? "success" : "warning"}>
+                      {pod.ready}
+                    </Badge>
+                  );
+                })()}
+              </TableCell>
               <TableCell>{pod.restarts}</TableCell>
               <TableCell>{pod.age}</TableCell>
               <TableCell className="text-muted-foreground">

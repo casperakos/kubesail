@@ -15,6 +15,7 @@ import { RefreshCw, Eye, Search, X, Code, Trash2, FileText } from "lucide-react"
 import { ConfigMapInfo } from "../../types";
 import { YamlViewer } from "../../components/YamlViewer";
 import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 
 export function ConfigMapsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
@@ -61,11 +62,7 @@ export function ConfigMapsList() {
   }, [configmaps, searchQuery]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner message="Loading configmaps..." />;
   }
 
   if (error) {

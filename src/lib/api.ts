@@ -23,6 +23,8 @@ import type {
   ClusterRoleBindingInfo,
   ServiceAccountInfo,
   PortForwardInfo,
+  HelmRelease,
+  HelmReleaseDetail,
 } from "../types";
 
 export const api = {
@@ -415,5 +417,57 @@ export const api = {
   // CRD operations
   async getCRDs(): Promise<any[]> {
     return await invoke("get_crds");
+  },
+
+  // Helm operations
+  async helmCheckInstalled(): Promise<boolean> {
+    return await invoke("helm_check_installed");
+  },
+
+  async helmListReleases(
+    namespace?: string,
+    allNamespaces = false
+  ): Promise<HelmRelease[]> {
+    return await invoke("helm_list_releases", { namespace, allNamespaces });
+  },
+
+  async helmGetRelease(
+    name: string,
+    namespace: string
+  ): Promise<HelmReleaseDetail> {
+    return await invoke("helm_get_release", { name, namespace });
+  },
+
+  async helmGetManifest(name: string, namespace: string): Promise<string> {
+    return await invoke("helm_get_manifest", { name, namespace });
+  },
+
+  async helmGetValues(name: string, namespace: string): Promise<string> {
+    return await invoke("helm_get_values", { name, namespace });
+  },
+
+  async helmUninstallRelease(name: string, namespace: string): Promise<string> {
+    return await invoke("helm_uninstall_release", { name, namespace });
+  },
+
+  async helmRollbackRelease(
+    name: string,
+    namespace: string,
+    revision: number
+  ): Promise<string> {
+    return await invoke("helm_rollback_release", { name, namespace, revision });
+  },
+
+  async helmGetHistory(name: string, namespace: string): Promise<any[]> {
+    return await invoke("helm_get_history", { name, namespace });
+  },
+
+  async helmUpgradeRelease(
+    name: string,
+    chart: string,
+    namespace: string,
+    values?: string
+  ): Promise<string> {
+    return await invoke("helm_upgrade_release", { name, chart, namespace, values });
   },
 };

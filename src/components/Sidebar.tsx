@@ -23,6 +23,7 @@ import {
   BoxesIcon,
   Workflow,
   Zap,
+  Package,
 } from "lucide-react";
 import { ResourceType } from "../types";
 import { Logo } from "./Logo";
@@ -67,6 +68,10 @@ const navSections: {
   {
     title: "Custom Resources",
     items: [{ icon: Database, label: "CRDs", view: "crds" }],
+  },
+  {
+    title: "Package Management",
+    items: [{ icon: Package, label: "Helm Releases", view: "helm" }],
   },
   {
     title: "Security",

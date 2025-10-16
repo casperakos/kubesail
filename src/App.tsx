@@ -19,6 +19,7 @@ import { NodesList } from "./features/nodes/NodesList";
 import { EventsList } from "./features/events/EventsList";
 import { PortForwardsPage } from "./features/portforwards/PortForwardsPage";
 import { CRDsList } from "./features/crds/CRDsList";
+import { HelmReleasesList } from "./features/helm/HelmReleasesList";
 import { ControllerPage } from "./features/controllers/ControllerPage";
 import { useAppStore } from "./lib/store";
 
@@ -92,6 +93,7 @@ function MainContent() {
         {currentView === "events" && <EventsList />}
         {currentView === "portforwards" && <PortForwardsPage />}
         {currentView === "crds" && <CRDsList />}
+        {currentView === "helm" && <HelmReleasesList />}
         {currentView === "argocd" && <ControllerPage controllerId="argocd" />}
         {currentView === "flux" && <ControllerPage controllerId="flux" />}
         {currentView === "external-secrets" && <ControllerPage controllerId="external-secrets" />}

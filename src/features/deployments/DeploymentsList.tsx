@@ -19,6 +19,7 @@ import { api } from "../../lib/api";
 import { PodSelectorModal } from "../../components/PodSelectorModal";
 import { LogsViewer } from "../logs/LogsViewer";
 import { PodInfo } from "../../types";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 
 export function DeploymentsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
@@ -172,17 +173,7 @@ export function DeploymentsList() {
   }, [deployments, searchQuery]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64 animate-fade-in">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
-            <div className="absolute inset-0 w-12 h-12 rounded-full border-4 border-transparent border-t-purple-500 animate-spin" style={{animationDirection: 'reverse', animationDuration: '1.5s'}}></div>
-          </div>
-          <p className="text-sm text-muted-foreground font-medium">Loading deployments...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading deployments..." />;
   }
 
   if (error) {
@@ -292,9 +283,9 @@ export function DeploymentsList() {
                 <TableCell className="font-medium">{deployment.name}</TableCell>
                 {showNamespaceColumn && <TableCell>{deployment.namespace}</TableCell>}
                 <TableCell>
-                  <span className={ready === total ? "text-green-500" : "text-yellow-500"}>
+                  <Badge variant={ready === total ? "success" : "warning"}>
                     {deployment.ready}
-                  </span>
+                  </Badge>
                 </TableCell>
                 <TableCell>{deployment.up_to_date}</TableCell>
                 <TableCell>{deployment.available}</TableCell>

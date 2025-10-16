@@ -1,4 +1,5 @@
 mod commands;
+mod helm;
 mod kube;
 mod portforward;
 mod shell;
@@ -90,8 +91,18 @@ pub fn run() {
             commands::get_custom_resources,
             commands::delete_custom_resource,
             commands::get_custom_resource_yaml,
+            commands::update_custom_resource_yaml,
             commands::describe_custom_resource,
             commands::sync_argocd_app,
+            commands::helm_check_installed,
+            commands::helm_list_releases,
+            commands::helm_get_release,
+            commands::helm_get_manifest,
+            commands::helm_get_values,
+            commands::helm_uninstall_release,
+            commands::helm_rollback_release,
+            commands::helm_get_history,
+            commands::helm_upgrade_release,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

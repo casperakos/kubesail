@@ -16,6 +16,7 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { RefreshCw, Search, X, Code } from "lucide-react";
 import { YamlViewer } from "../../components/YamlViewer";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 
 type StorageType = "pv" | "pvc";
 
@@ -183,11 +184,7 @@ function PersistentVolumesTable({ data, isLoading, error, searchQuery, onViewYam
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner message="Loading persistent volumes..." />;
   }
 
   if (error) {
@@ -282,11 +279,7 @@ function PersistentVolumeClaimsTable({ data, isLoading, error, searchQuery, onVi
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner message="Loading persistent volume claims..." />;
   }
 
   if (error) {

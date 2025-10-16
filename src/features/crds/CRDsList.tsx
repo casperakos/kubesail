@@ -13,6 +13,7 @@ import { Loader2, Search, Database, ArrowLeft, Eye, FileText, Trash2, X } from "
 import { useAppStore } from "../../lib/store";
 import { CustomResourceDescribeViewer } from "../../components/CustomResourceDescribeViewer";
 import { CustomResourceYamlViewer } from "../../components/CustomResourceYamlViewer";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 
 interface CRD {
   name: string;
@@ -171,11 +172,7 @@ export function CRDsList() {
   // Show custom resources view
   if (selectedCRD) {
     if (resourcesLoading) {
-      return (
-        <div className="flex items-center justify-center h-full">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      );
+      return <LoadingSpinner message={`Loading ${selectedCRD.kind} resources...`} />;
     }
 
     if (resourcesError) {
@@ -330,11 +327,7 @@ export function CRDsList() {
 
   // Show CRDs list
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+    return <LoadingSpinner message="Loading CRDs..." />;
   }
 
   if (error) {

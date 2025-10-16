@@ -33,6 +33,7 @@ import { api } from "../../lib/api";
 import { PodSelectorModal } from "../../components/PodSelectorModal";
 import { LogsViewer } from "../logs/LogsViewer";
 import { PodInfo } from "../../types";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 
 type WorkloadType = "statefulsets" | "daemonsets" | "jobs" | "cronjobs";
 
@@ -373,11 +374,7 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner message="Loading statefulsets..." />;
   }
 
   if (error) {
@@ -720,11 +717,7 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner message="Loading daemonsets..." />;
   }
 
   if (error) {
@@ -984,11 +977,7 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner message="Loading jobs..." />;
   }
 
   if (error) {
@@ -1250,11 +1239,7 @@ function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any)
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner message="Loading cronjobs..." />;
   }
 
   if (error) {

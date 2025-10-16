@@ -1022,6 +1022,34 @@ pub async fn get_custom_resource_yaml(
 }
 
 #[tauri::command]
+pub async fn update_custom_resource_yaml(
+    client_manager: State<'_, KubeClientManager>,
+    group: String,
+    version: String,
+    plural: String,
+    name: String,
+    namespace: Option<String>,
+    yaml: String,
+) -> Result<(), String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::update_custom_resource_yaml(
+        client,
+        &group,
+        &version,
+        &plural,
+        &name,
+        namespace.as_deref(),
+        &yaml,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn describe_custom_resource(
     client_manager: State<'_, KubeClientManager>,
     group: String,
@@ -1059,6 +1087,89 @@ pub async fn sync_argocd_app(
         .map_err(|e| e.to_string())?;
 
     crate::kube::sync_argocd_app(client, &name, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ==================== Helm Commands ====================
+
+#[tauri::command]
+pub async fn helm_check_installed() -> Result<bool, String> {
+    crate::helm::check_helm_installed()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn helm_list_releases(
+    namespace: Option<String>,
+    all_namespaces: bool,
+) -> Result<Vec<crate::helm::HelmRelease>, String> {
+    crate::helm::list_releases(namespace.as_deref(), all_namespaces)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn helm_get_release(
+    name: String,
+    namespace: String,
+) -> Result<crate::helm::HelmReleaseDetail, String> {
+    crate::helm::get_release(&name, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn helm_get_manifest(name: String, namespace: String) -> Result<String, String> {
+    crate::helm::get_manifest(&name, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn helm_get_values(name: String, namespace: String) -> Result<String, String> {
+    crate::helm::get_values(&name, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn helm_uninstall_release(name: String, namespace: String) -> Result<String, String> {
+    crate::helm::uninstall_release(&name, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn helm_rollback_release(
+    name: String,
+    namespace: String,
+    revision: u32,
+) -> Result<String, String> {
+    crate::helm::rollback_release(&name, &namespace, revision)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn helm_get_history(
+    name: String,
+    namespace: String,
+) -> Result<Vec<serde_json::Value>, String> {
+    crate::helm::get_history(&name, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn helm_upgrade_release(
+    name: String,
+    chart: String,
+    namespace: String,
+    values: Option<String>,
+) -> Result<String, String> {
+    crate::helm::upgrade_release(&name, &chart, &namespace, values.as_deref())
         .await
         .map_err(|e| e.to_string())
 }

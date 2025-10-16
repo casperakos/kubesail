@@ -12,6 +12,7 @@ import {
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { RefreshCw, Search, X } from "lucide-react";
+import { LoadingSpinner } from "../../components/LoadingSpinner";
 
 export function EventsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
@@ -45,11 +46,7 @@ export function EventsList() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <LoadingSpinner message="Loading events..." />;
   }
 
   if (error) {
