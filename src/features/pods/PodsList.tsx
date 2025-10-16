@@ -160,38 +160,31 @@ export function PodsList() {
     let successCount = 0;
     let errorCount = 0;
 
+    setShowBulkDeleteConfirm(false);
+
     for (const podName of selectedPods) {
       const pod = pods?.find(p => p.name === podName);
       if (pod) {
-        deletePod.mutate(
-          { namespace: pod.namespace, podName },
-          {
-            onSuccess: () => {
-              successCount++;
-              if (successCount + errorCount === podCount) {
-                if (errorCount === 0) {
-                  addToast(`${podCount} pod${podCount > 1 ? 's' : ''} have been deleted`, "success");
-                } else {
-                  addToast(`${successCount} pod${successCount > 1 ? 's' : ''} deleted, ${errorCount} failed`, "warning");
-                }
-              }
-            },
-            onError: () => {
-              errorCount++;
-              if (successCount + errorCount === podCount) {
-                if (successCount === 0) {
-                  addToast(`Failed to delete ${podCount} pod${podCount > 1 ? 's' : ''}`, "error");
-                } else {
-                  addToast(`${successCount} pod${successCount > 1 ? 's' : ''} deleted, ${errorCount} failed`, "warning");
-                }
-              }
-            },
-          }
-        );
+        try {
+          await deletePod.mutateAsync({ namespace: pod.namespace, podName });
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to delete pod ${podName}:`, error);
+          errorCount++;
+        }
       }
     }
+
+    // Show final toast after all deletions complete
+    if (errorCount === 0) {
+      addToast(`${podCount} pod${podCount > 1 ? 's' : ''} have been deleted`, "success");
+    } else if (successCount === 0) {
+      addToast(`Failed to delete ${podCount} pod${podCount > 1 ? 's' : ''}`, "error");
+    } else {
+      addToast(`${successCount} pod${successCount > 1 ? 's' : ''} deleted, ${errorCount} failed`, "warning");
+    }
+
     setSelectedPods(new Set());
-    setShowBulkDeleteConfirm(false);
   };
 
   const cancelBulkDelete = () => {
