@@ -192,12 +192,32 @@ pub async fn get_history(name: &str, namespace: &str) -> Result<Vec<serde_json::
     Ok(history)
 }
 
+/// Get default values for a Helm chart
+pub async fn get_chart_values(chart: &str) -> Result<String> {
+    let mut cmd = Command::new("helm");
+    cmd.arg("show");
+    cmd.arg("values");
+    cmd.arg(chart);
+
+    let output = cmd.output().await?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow!("Failed to get chart values: {}", stderr));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout.to_string())
+}
+
 /// Upgrade a Helm release with new values
 pub async fn upgrade_release(
     name: &str,
     chart: &str,
     namespace: &str,
     values: Option<&str>,
+    create_namespace: bool,
+    version: Option<&str>,
 ) -> Result<String> {
     let mut cmd = Command::new("helm");
     cmd.arg("upgrade");
@@ -205,6 +225,14 @@ pub async fn upgrade_release(
     cmd.arg(chart);
     cmd.arg("--namespace").arg(namespace);
     cmd.arg("--install"); // Install if not exists
+
+    if create_namespace {
+        cmd.arg("--create-namespace");
+    }
+
+    if let Some(ver) = version {
+        cmd.arg("--version").arg(ver);
+    }
 
     if let Some(vals) = values {
         // Write values to a temporary file

@@ -474,13 +474,26 @@ export const api = {
     return await invoke("helm_get_history", { name, namespace });
   },
 
+  async helmGetChartValues(chart: string): Promise<string> {
+    return await invoke("helm_get_chart_values", { chart });
+  },
+
   async helmUpgradeRelease(
     name: string,
     chart: string,
     namespace: string,
-    values?: string
+    values?: string,
+    createNamespace?: boolean,
+    version?: string
   ): Promise<string> {
-    return await invoke("helm_upgrade_release", { name, chart, namespace, values });
+    return await invoke("helm_upgrade_release", {
+      name,
+      chart,
+      namespace,
+      values,
+      createNamespace: createNamespace || false,
+      version
+    });
   },
 
   // Metrics operations

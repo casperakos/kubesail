@@ -1163,13 +1163,22 @@ pub async fn helm_get_history(
 }
 
 #[tauri::command]
+pub async fn helm_get_chart_values(chart: String) -> Result<String, String> {
+    crate::helm::get_chart_values(&chart)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn helm_upgrade_release(
     name: String,
     chart: String,
     namespace: String,
     values: Option<String>,
+    create_namespace: bool,
+    version: Option<String>,
 ) -> Result<String, String> {
-    crate::helm::upgrade_release(&name, &chart, &namespace, values.as_deref())
+    crate::helm::upgrade_release(&name, &chart, &namespace, values.as_deref(), create_namespace, version.as_deref())
         .await
         .map_err(|e| e.to_string())
 }

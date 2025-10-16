@@ -154,6 +154,7 @@ pub fn run() {
             commands::helm_uninstall_release,
             commands::helm_rollback_release,
             commands::helm_get_history,
+            commands::helm_get_chart_values,
             commands::helm_upgrade_release,
             commands::detect_metrics_capabilities,
             commands::get_cluster_metrics_data,
