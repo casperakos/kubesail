@@ -118,15 +118,24 @@ export function ClusterSelector() {
   const handleSwitchContext = async (contextName: string) => {
     setLoading(true);
     setError(null);
+
+    // Create a timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Operation timed out - authentication may have been cancelled")), 30000);
+    });
+
     try {
-      await invoke("switch_kube_context", { contextName });
+      // Race between the actual operation and timeout
+      await Promise.race([
+        invoke("switch_kube_context", { contextName }),
+        timeoutPromise
+      ]);
       await loadContexts();
       setShowModal(false);
       // Reload the page to refresh all data
       window.location.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to switch context");
-    } finally {
       setLoading(false);
     }
   };
