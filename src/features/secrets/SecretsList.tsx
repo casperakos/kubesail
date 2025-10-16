@@ -12,7 +12,7 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Eye, EyeOff, Search, X, Code, Trash2, FileText } from "lucide-react";
+import { RefreshCw, Eye, EyeOff, Search, X, Code, Trash2, FileText, AlertTriangle } from "lucide-react";
 import { SecretInfo } from "../../types";
 import { YamlViewer } from "../../components/YamlViewer";
 import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
