@@ -1518,7 +1518,11 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
                               <FileText className="w-4 h-4" />
                             </Button>
                             <Button
-                              onClick={() => handleDeleteResource(resource)}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleDeleteResource(resource);
+                              }}
                               variant="ghost"
                               size="sm"
                               className="text-destructive hover:text-destructive"
