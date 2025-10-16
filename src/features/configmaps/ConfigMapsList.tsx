@@ -12,7 +12,8 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Eye, Search, X, Code, Trash2, FileText } from "lucide-react";
+import { RefreshCw, Eye, Search, X, Code, Trash2, FileText, MoreVertical } from "lucide-react";
+import { ContextMenu, ContextMenuItem, ContextMenuTrigger } from "../../components/ui/ContextMenu";
 import { ConfigMapInfo } from "../../types";
 import { YamlViewer } from "../../components/YamlViewer";
 import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
@@ -139,58 +140,58 @@ export function ConfigMapsList() {
         <TableBody>
           {filteredConfigMaps.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={4 + (showNamespaceColumn ? 1 : 0)} className="text-center py-8 text-muted-foreground">
                 {searchQuery ? `No configmaps found matching "${searchQuery}"` : "No configmaps found"}
               </TableCell>
             </TableRow>
           ) : (
-            filteredConfigMaps.map((cm) => (
-            <TableRow key={cm.name}>
-              <TableCell className="font-medium">{cm.name}</TableCell>
-              {showNamespaceColumn && <TableCell>{cm.namespace}</TableCell>}
-              <TableCell>
-                <Badge variant="secondary">{cm.keys} keys</Badge>
-              </TableCell>
-              <TableCell>{cm.age}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSelectedResource({name: cm.name, namespace: cm.namespace})}
-                    title="View YAML"
-                  >
-                    <Code className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSelectedConfigMapForDescribe({name: cm.name, namespace: cm.namespace})}
-                    title="Describe"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSelectedConfigMap(cm)}
-                    title="View data"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(cm.name)}
-                    disabled={deleteConfigMap.isPending}
-                    title="Delete configmap"
-                  >
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-            ))
+            filteredConfigMaps.map((cm) => {
+              const menuItems: ContextMenuItem[] = [
+                {
+                  label: "View YAML",
+                  icon: <Code className="w-4 h-4" />,
+                  onClick: () => setSelectedResource({name: cm.name, namespace: cm.namespace})
+                },
+                {
+                  label: "Describe",
+                  icon: <FileText className="w-4 h-4" />,
+                  onClick: () => setSelectedConfigMapForDescribe({name: cm.name, namespace: cm.namespace})
+                },
+                {
+                  label: "View Data",
+                  icon: <Eye className="w-4 h-4" />,
+                  onClick: () => setSelectedConfigMap(cm)
+                },
+                { separator: true },
+                {
+                  label: "Delete",
+                  icon: <Trash2 className="w-4 h-4" />,
+                  onClick: () => handleDelete(cm.name),
+                  variant: "danger" as const,
+                  disabled: deleteConfigMap.isPending
+                }
+              ];
+
+              return (
+                <ContextMenuTrigger key={cm.name} items={menuItems}>
+                  <TableRow>
+                    <TableCell className="font-medium">{cm.name}</TableCell>
+                    {showNamespaceColumn && <TableCell>{cm.namespace}</TableCell>}
+                    <TableCell>
+                      <Badge variant="secondary">{cm.keys} keys</Badge>
+                    </TableCell>
+                    <TableCell>{cm.age}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end">
+                        <ContextMenu items={menuItems}>
+                          <MoreVertical className="w-4 h-4" />
+                        </ContextMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </ContextMenuTrigger>
+              );
+            })
           )}
         </TableBody>
       </Table>

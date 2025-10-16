@@ -10,10 +10,11 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Shield, Globe, Search, X, Code, ChevronDown, ChevronRight } from "lucide-react";
+import { RefreshCw, Shield, Globe, Search, X, Code, ChevronDown, ChevronRight, MoreVertical } from "lucide-react";
 import { IngressInfo } from "../../types";
 import { useState, useMemo } from "react";
 import { YamlViewer } from "../../components/YamlViewer";
+import { ContextMenu, ContextMenuTrigger, type ContextMenuItem } from "../../components/ui/ContextMenu";
 
 export function IngressesList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
@@ -174,7 +175,7 @@ export function IngressesList() {
         <TableBody>
           {filteredIngresses.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={9 + (showNamespaceColumn ? 1 : 0)} className="text-center py-8 text-muted-foreground">
                 {searchQuery ? `No ingresses found matching "${searchQuery}"` : "No ingresses found"}
               </TableCell>
             </TableRow>
@@ -184,89 +185,98 @@ export function IngressesList() {
               const colSpan = showNamespaceColumn ? 10 : 9;
               const hasRules = ingress.rules && ingress.rules.length > 0;
 
+              // Build context menu items for this ingress
+              const menuItems: ContextMenuItem[] = [
+                {
+                  label: "View YAML",
+                  icon: <Code className="w-4 h-4" />,
+                  onClick: () => setSelectedResource({name: ingress.name, namespace: ingress.namespace})
+                }
+              ];
+
               return [
                 // Main ingress row
-                <TableRow key={ingress.name}>
-                  <TableCell>
-                    {hasRules && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => toggleIngressExpand(ingress.name)}
-                        className="h-6 w-6"
-                      >
-                        {isExpanded ? (
-                          <ChevronDown className="w-4 h-4" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4" />
-                        )}
-                      </Button>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-medium">{ingress.name}</TableCell>
-                  {showNamespaceColumn && <TableCell>{ingress.namespace}</TableCell>}
-                  <TableCell>
-                    {ingress.class ? (
-                      <Badge variant={getIngressClassVariant(ingress.class)}>
-                        {ingress.class}
+                <ContextMenuTrigger key={ingress.name} items={menuItems}>
+                  <TableRow>
+                    <TableCell>
+                      {hasRules && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => toggleIngressExpand(ingress.name)}
+                          className="h-6 w-6"
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="w-4 h-4" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4" />
+                          )}
+                        </Button>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium">{ingress.name}</TableCell>
+                    {showNamespaceColumn && <TableCell>{ingress.namespace}</TableCell>}
+                    <TableCell>
+                      {ingress.class ? (
+                        <Badge variant={getIngressClassVariant(ingress.class)}>
+                          {ingress.class}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {ingress.hosts.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {ingress.hosts.map((host, idx) => (
+                            <div key={idx} className="flex items-center gap-1 text-sm">
+                              <Globe className="w-3 h-3" />
+                              <span className="font-mono">{host}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">*</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {ingress.addresses.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {ingress.addresses.map((addr, idx) => (
+                            <span key={idx} className="font-mono text-sm">
+                              {addr}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">Pending...</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {ingress.tls ? (
+                        <div className="flex items-center gap-1 text-green-500">
+                          <Shield className="w-4 h-4" />
+                          <span className="text-sm">Enabled</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">No</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={hasRules ? "default" : "secondary"}>
+                        {hasRules ? `${ingress.rules.length} ${ingress.rules.length === 1 ? "rule" : "rules"}` : "No rules"}
                       </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {ingress.hosts.length > 0 ? (
-                      <div className="flex flex-col gap-1">
-                        {ingress.hosts.map((host, idx) => (
-                          <div key={idx} className="flex items-center gap-1 text-sm">
-                            <Globe className="w-3 h-3" />
-                            <span className="font-mono">{host}</span>
-                          </div>
-                        ))}
+                    </TableCell>
+                    <TableCell>{ingress.age}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end">
+                        <ContextMenu items={menuItems}>
+                          <MoreVertical className="w-4 h-4" />
+                        </ContextMenu>
                       </div>
-                    ) : (
-                      <span className="text-muted-foreground">*</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {ingress.addresses.length > 0 ? (
-                      <div className="flex flex-col gap-1">
-                        {ingress.addresses.map((addr, idx) => (
-                          <span key={idx} className="font-mono text-sm">
-                            {addr}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">Pending...</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {ingress.tls ? (
-                      <div className="flex items-center gap-1 text-green-500">
-                        <Shield className="w-4 h-4" />
-                        <span className="text-sm">Enabled</span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">No</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={hasRules ? "default" : "secondary"}>
-                      {hasRules ? `${ingress.rules.length} ${ingress.rules.length === 1 ? "rule" : "rules"}` : "No rules"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{ingress.age}</TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedResource({name: ingress.name, namespace: ingress.namespace})}
-                    >
-                      <Code className="w-4 h-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>,
+                    </TableCell>
+                  </TableRow>
+                </ContextMenuTrigger>,
                 // Expandable row for routing rules
                 ...(isExpanded && hasRules
                   ? [

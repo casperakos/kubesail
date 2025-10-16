@@ -1079,6 +1079,11 @@ pub async fn get_resource_yaml(
             let node = nodes.get(name).await?;
             serde_yaml::to_string(&node)?
         }
+        "namespace" | "ns" => {
+            let namespaces: Api<Namespace> = Api::all(client);
+            let ns = namespaces.get(name).await?;
+            serde_yaml::to_string(&ns)?
+        }
         _ => return Err(anyhow::anyhow!("Unsupported resource type: {}", resource_type)),
     };
 

@@ -12,7 +12,8 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Eye, EyeOff, Search, X, Code, Trash2, FileText, AlertTriangle } from "lucide-react";
+import { RefreshCw, Eye, EyeOff, Search, X, Code, Trash2, FileText, AlertTriangle, MoreVertical } from "lucide-react";
+import { ContextMenu, ContextMenuItem, ContextMenuTrigger } from "../../components/ui/ContextMenu";
 import { SecretInfo } from "../../types";
 import { YamlViewer } from "../../components/YamlViewer";
 import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
@@ -147,63 +148,63 @@ export function SecretsList() {
         <TableBody>
           {filteredSecrets.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={5 + (showNamespaceColumn ? 1 : 0)} className="text-center py-8 text-muted-foreground">
                 {searchQuery ? `No secrets found matching "${searchQuery}"` : "No secrets found"}
               </TableCell>
             </TableRow>
           ) : (
-            filteredSecrets.map((secret) => (
-            <TableRow key={secret.name}>
-              <TableCell className="font-medium">{secret.name}</TableCell>
-              {showNamespaceColumn && <TableCell>{secret.namespace}</TableCell>}
-              <TableCell>
-                <Badge variant={getTypeVariant(secret.secret_type)}>
-                  {secret.secret_type}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <Badge variant="secondary">{secret.keys} keys</Badge>
-              </TableCell>
-              <TableCell>{secret.age}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSelectedResource({name: secret.name, namespace: secret.namespace})}
-                    title="View YAML"
-                  >
-                    <Code className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSelectedSecretForDescribe({name: secret.name, namespace: secret.namespace})}
-                    title="Describe"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSelectedSecret(secret)}
-                    title="View secret data"
-                  >
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(secret.name)}
-                    disabled={deleteSecret.isPending}
-                    title="Delete secret"
-                  >
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-            ))
+            filteredSecrets.map((secret) => {
+              const menuItems: ContextMenuItem[] = [
+                {
+                  label: "View YAML",
+                  icon: <Code className="w-4 h-4" />,
+                  onClick: () => setSelectedResource({name: secret.name, namespace: secret.namespace})
+                },
+                {
+                  label: "Describe",
+                  icon: <FileText className="w-4 h-4" />,
+                  onClick: () => setSelectedSecretForDescribe({name: secret.name, namespace: secret.namespace})
+                },
+                {
+                  label: "View Secret Data",
+                  icon: <Eye className="w-4 h-4" />,
+                  onClick: () => setSelectedSecret(secret)
+                },
+                { separator: true },
+                {
+                  label: "Delete",
+                  icon: <Trash2 className="w-4 h-4" />,
+                  onClick: () => handleDelete(secret.name),
+                  variant: "danger" as const,
+                  disabled: deleteSecret.isPending
+                }
+              ];
+
+              return (
+                <ContextMenuTrigger key={secret.name} items={menuItems}>
+                  <TableRow>
+                    <TableCell className="font-medium">{secret.name}</TableCell>
+                    {showNamespaceColumn && <TableCell>{secret.namespace}</TableCell>}
+                    <TableCell>
+                      <Badge variant={getTypeVariant(secret.secret_type)}>
+                        {secret.secret_type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{secret.keys} keys</Badge>
+                    </TableCell>
+                    <TableCell>{secret.age}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end">
+                        <ContextMenu items={menuItems}>
+                          <MoreVertical className="w-4 h-4" />
+                        </ContextMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </ContextMenuTrigger>
+              );
+            })
           )}
         </TableBody>
       </Table>

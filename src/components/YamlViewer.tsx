@@ -157,8 +157,12 @@ export function YamlViewer({
             <h2 className="text-lg font-semibold">Resource YAML</h2>
             <div className="flex items-center gap-2 mt-1">
               <Badge variant="secondary">{resourceType}</Badge>
-              <span className="text-sm text-muted-foreground">/</span>
-              <span className="text-sm font-mono">{namespace}</span>
+              {namespace && (
+                <>
+                  <span className="text-sm text-muted-foreground">/</span>
+                  <span className="text-sm font-mono">{namespace}</span>
+                </>
+              )}
               <span className="text-sm text-muted-foreground">/</span>
               <span className="text-sm font-mono">{resourceName}</span>
             </div>

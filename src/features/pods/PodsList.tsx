@@ -12,7 +12,8 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { Trash2, RefreshCw, FileText, Code, Search, X, ArrowRightLeft, ScrollText, Terminal } from "lucide-react";
+import { Trash2, RefreshCw, FileText, Code, Search, X, ArrowRightLeft, ScrollText, Terminal, MoreVertical } from "lucide-react";
+import { ContextMenu, ContextMenuTrigger, type ContextMenuItem } from "../../components/ui/ContextMenu";
 import { LogsViewer } from "../logs/LogsViewer";
 import { YamlViewer } from "../../components/YamlViewer";
 import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
@@ -325,12 +326,14 @@ export function PodsList() {
         <TableHeader>
           <TableRow>
             <TableHead className="w-12">
-              <input
-                type="checkbox"
-                checked={selectedPods.size === filteredPods.length && filteredPods.length > 0}
-                onChange={toggleSelectAll}
-                className="w-4 h-4 cursor-pointer"
-              />
+              <div className="flex items-center justify-center">
+                <input
+                  type="checkbox"
+                  checked={selectedPods.size === filteredPods.length && filteredPods.length > 0}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 cursor-pointer"
+                />
+              </div>
             </TableHead>
             <TableHead>Name</TableHead>
             {showNamespaceColumn && <TableHead>Namespace</TableHead>}
@@ -352,7 +355,10 @@ export function PodsList() {
         <TableBody>
           {filteredPods.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+              <TableCell
+                colSpan={9 + (showNamespaceColumn ? 1 : 0) + (hasAdvancedMetrics ? 2 : 0)}
+                className="text-center py-8 text-muted-foreground"
+              >
                 {searchQuery ? `No pods found matching "${searchQuery}"` : "No pods found"}
               </TableCell>
             </TableRow>
@@ -360,8 +366,46 @@ export function PodsList() {
             filteredPods.map((pod) => {
               const metrics = getPodMetrics(pod.name, pod.namespace);
 
+              // Build context menu items for this pod
+              const menuItems: ContextMenuItem[] = [
+                ...(pod.ports && pod.ports.length > 0 ? [{
+                  label: "Port Forward",
+                  icon: <ArrowRightLeft className="w-4 h-4" />,
+                  onClick: () => setSelectedPodForPortForward({ name: pod.name, namespace: pod.namespace, ports: pod.ports })
+                }] : []),
+                {
+                  label: "View YAML",
+                  icon: <Code className="w-4 h-4" />,
+                  onClick: () => setSelectedPodForYaml({name: pod.name, namespace: pod.namespace})
+                },
+                {
+                  label: "Describe",
+                  icon: <FileText className="w-4 h-4" />,
+                  onClick: () => setSelectedPodForDescribe({name: pod.name, namespace: pod.namespace})
+                },
+                {
+                  label: "View Logs",
+                  icon: <ScrollText className="w-4 h-4" />,
+                  onClick: () => setSelectedPodForLogs({name: pod.name, namespace: pod.namespace})
+                },
+                {
+                  label: "Shell Access",
+                  icon: <Terminal className="w-4 h-4" />,
+                  onClick: () => setSelectedPodForShell({name: pod.name, namespace: pod.namespace})
+                },
+                { separator: true },
+                {
+                  label: "Delete",
+                  icon: <Trash2 className="w-4 h-4" />,
+                  onClick: () => handleDelete(pod.name),
+                  variant: "danger" as const,
+                  disabled: deletePod.isPending
+                }
+              ];
+
               return (
-                <TableRow key={pod.name}>
+                <ContextMenuTrigger key={pod.name} items={menuItems}>
+                  <TableRow>
                   <TableCell>
                     <input
                       type="checkbox"
@@ -424,61 +468,14 @@ export function PodsList() {
                     {pod.ip || "-"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {pod.ports && pod.ports.length > 0 && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setSelectedPodForPortForward({ name: pod.name, namespace: pod.namespace, ports: pod.ports })}
-                          title={`Port Forward (${pod.ports.join(', ')})`}
-                        >
-                          <ArrowRightLeft className="w-4 h-4" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSelectedPodForYaml({name: pod.name, namespace: pod.namespace})}
-                        title="View YAML"
-                      >
-                        <Code className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSelectedPodForDescribe({name: pod.name, namespace: pod.namespace})}
-                        title="Describe"
-                      >
-                        <FileText className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSelectedPodForLogs({name: pod.name, namespace: pod.namespace})}
-                        title="View logs"
-                      >
-                        <ScrollText className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSelectedPodForShell({name: pod.name, namespace: pod.namespace})}
-                        title="Shell access"
-                      >
-                        <Terminal className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(pod.name)}
-                        disabled={deletePod.isPending}
-                        title="Delete pod"
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
+                    <div className="flex items-center justify-end">
+                      <ContextMenu items={menuItems}>
+                        <MoreVertical className="w-4 h-4" />
+                      </ContextMenu>
                     </div>
                   </TableCell>
                 </TableRow>
+                </ContextMenuTrigger>
               );
             })
           )}

@@ -17,7 +17,8 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, Code, FileText } from "lucide-react";
+import { RefreshCw, Search, X, MoreVertical } from "lucide-react";
+import { ContextMenu, ContextMenuItem, ContextMenuTrigger } from "../../components/ui/ContextMenu";
 import { YamlViewer } from "../../components/YamlViewer";
 import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
@@ -323,36 +324,38 @@ function RolesTable({ data, isLoading, error, searchQuery, onViewYaml, onDescrib
             </TableCell>
           </TableRow>
         ) : (
-          data.map((role) => (
-            <TableRow key={`${role.namespace}-${role.name}`}>
-              <TableCell className="font-medium">{role.name}</TableCell>
-              {showNamespaceColumn && <TableCell>{role.namespace}</TableCell>}
-              <TableCell>
-                <Badge variant="secondary">{role.rules_count}</Badge>
-              </TableCell>
-              <TableCell>{role.age}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onViewYaml({name: role.name, namespace: role.namespace})}
-                    title="View YAML"
-                  >
-                    <Code className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onDescribe({name: role.name, namespace: role.namespace})}
-                    title="Describe"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))
+          data.map((role) => {
+            const menuItems: ContextMenuItem[] = [
+              {
+                label: "View YAML",
+                onClick: () => onViewYaml({name: role.name, namespace: role.namespace}),
+              },
+              {
+                label: "Describe",
+                onClick: () => onDescribe({name: role.name, namespace: role.namespace}),
+              },
+            ];
+
+            return (
+              <ContextMenuTrigger key={`${role.namespace}-${role.name}`} items={menuItems}>
+                <TableRow>
+                  <TableCell className="font-medium">{role.name}</TableCell>
+                  {showNamespaceColumn && <TableCell>{role.namespace}</TableCell>}
+                  <TableCell>
+                    <Badge variant="secondary">{role.rules_count}</Badge>
+                  </TableCell>
+                  <TableCell>{role.age}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end">
+                      <ContextMenu items={menuItems}>
+                        <MoreVertical className="w-4 h-4" />
+                      </ContextMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </ContextMenuTrigger>
+            );
+          })
         )}
       </TableBody>
     </Table>
@@ -397,48 +400,50 @@ function RoleBindingsTable({ data, isLoading, error, searchQuery, onViewYaml, on
             </TableCell>
           </TableRow>
         ) : (
-          data.map((rb) => (
-            <TableRow key={`${rb.namespace}-${rb.name}`}>
-              <TableCell className="font-medium">{rb.name}</TableCell>
-              {showNamespaceColumn && <TableCell>{rb.namespace}</TableCell>}
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">{rb.role_kind}</Badge>
-                  <span className="text-sm">{rb.role}</span>
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex flex-wrap gap-1">
-                  {rb.subjects.map((subject: SubjectInfo, idx: number) => (
-                    <Badge key={idx} variant="outline" className="text-xs">
-                      {subject.kind}: {subject.name}
-                    </Badge>
-                  ))}
-                </div>
-              </TableCell>
-              <TableCell>{rb.age}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onViewYaml({name: rb.name, namespace: rb.namespace})}
-                    title="View YAML"
-                  >
-                    <Code className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onDescribe({name: rb.name, namespace: rb.namespace})}
-                    title="Describe"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))
+          data.map((rb) => {
+            const menuItems: ContextMenuItem[] = [
+              {
+                label: "View YAML",
+                onClick: () => onViewYaml({name: rb.name, namespace: rb.namespace}),
+              },
+              {
+                label: "Describe",
+                onClick: () => onDescribe({name: rb.name, namespace: rb.namespace}),
+              },
+            ];
+
+            return (
+              <ContextMenuTrigger key={`${rb.namespace}-${rb.name}`} items={menuItems}>
+                <TableRow>
+                  <TableCell className="font-medium">{rb.name}</TableCell>
+                  {showNamespaceColumn && <TableCell>{rb.namespace}</TableCell>}
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="text-xs">{rb.role_kind}</Badge>
+                      <span className="text-sm">{rb.role}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {rb.subjects.map((subject: SubjectInfo, idx: number) => (
+                        <Badge key={idx} variant="outline" className="text-xs">
+                          {subject.kind}: {subject.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>{rb.age}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end">
+                      <ContextMenu items={menuItems}>
+                        <MoreVertical className="w-4 h-4" />
+                      </ContextMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </ContextMenuTrigger>
+            );
+          })
         )}
       </TableBody>
     </Table>
@@ -476,35 +481,37 @@ function ClusterRolesTable({ data, isLoading, error, searchQuery, onViewYaml, on
             </TableCell>
           </TableRow>
         ) : (
-          data.map((cr) => (
-            <TableRow key={cr.name}>
-              <TableCell className="font-medium">{cr.name}</TableCell>
-              <TableCell>
-                <Badge variant="secondary">{cr.rules_count}</Badge>
-              </TableCell>
-              <TableCell>{cr.age}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onViewYaml({name: cr.name})}
-                    title="View YAML"
-                  >
-                    <Code className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onDescribe({name: cr.name})}
-                    title="Describe"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))
+          data.map((cr) => {
+            const menuItems: ContextMenuItem[] = [
+              {
+                label: "View YAML",
+                onClick: () => onViewYaml({name: cr.name}),
+              },
+              {
+                label: "Describe",
+                onClick: () => onDescribe({name: cr.name}),
+              },
+            ];
+
+            return (
+              <ContextMenuTrigger key={cr.name} items={menuItems}>
+                <TableRow>
+                  <TableCell className="font-medium">{cr.name}</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{cr.rules_count}</Badge>
+                  </TableCell>
+                  <TableCell>{cr.age}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end">
+                      <ContextMenu items={menuItems}>
+                        <MoreVertical className="w-4 h-4" />
+                      </ContextMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </ContextMenuTrigger>
+            );
+          })
         )}
       </TableBody>
     </Table>
@@ -543,44 +550,46 @@ function ClusterRoleBindingsTable({ data, isLoading, error, searchQuery, onViewY
             </TableCell>
           </TableRow>
         ) : (
-          data.map((crb) => (
-            <TableRow key={crb.name}>
-              <TableCell className="font-medium">{crb.name}</TableCell>
-              <TableCell>
-                <span className="text-sm">{crb.role}</span>
-              </TableCell>
-              <TableCell>
-                <div className="flex flex-wrap gap-1">
-                  {crb.subjects.map((subject: SubjectInfo, idx: number) => (
-                    <Badge key={idx} variant="outline" className="text-xs">
-                      {subject.kind}: {subject.name}
-                    </Badge>
-                  ))}
-                </div>
-              </TableCell>
-              <TableCell>{crb.age}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onViewYaml({name: crb.name})}
-                    title="View YAML"
-                  >
-                    <Code className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onDescribe({name: crb.name})}
-                    title="Describe"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))
+          data.map((crb) => {
+            const menuItems: ContextMenuItem[] = [
+              {
+                label: "View YAML",
+                onClick: () => onViewYaml({name: crb.name}),
+              },
+              {
+                label: "Describe",
+                onClick: () => onDescribe({name: crb.name}),
+              },
+            ];
+
+            return (
+              <ContextMenuTrigger key={crb.name} items={menuItems}>
+                <TableRow>
+                  <TableCell className="font-medium">{crb.name}</TableCell>
+                  <TableCell>
+                    <span className="text-sm">{crb.role}</span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {crb.subjects.map((subject: SubjectInfo, idx: number) => (
+                        <Badge key={idx} variant="outline" className="text-xs">
+                          {subject.kind}: {subject.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>{crb.age}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end">
+                      <ContextMenu items={menuItems}>
+                        <MoreVertical className="w-4 h-4" />
+                      </ContextMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </ContextMenuTrigger>
+            );
+          })
         )}
       </TableBody>
     </Table>
@@ -624,36 +633,38 @@ function ServiceAccountsTable({ data, isLoading, error, searchQuery, onViewYaml,
             </TableCell>
           </TableRow>
         ) : (
-          data.map((sa) => (
-            <TableRow key={`${sa.namespace}-${sa.name}`}>
-              <TableCell className="font-medium">{sa.name}</TableCell>
-              {showNamespaceColumn && <TableCell>{sa.namespace}</TableCell>}
-              <TableCell>
-                <Badge variant="secondary">{sa.secrets}</Badge>
-              </TableCell>
-              <TableCell>{sa.age}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onViewYaml({name: sa.name, namespace: sa.namespace})}
-                    title="View YAML"
-                  >
-                    <Code className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onDescribe({name: sa.name, namespace: sa.namespace})}
-                    title="Describe"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))
+          data.map((sa) => {
+            const menuItems: ContextMenuItem[] = [
+              {
+                label: "View YAML",
+                onClick: () => onViewYaml({name: sa.name, namespace: sa.namespace}),
+              },
+              {
+                label: "Describe",
+                onClick: () => onDescribe({name: sa.name, namespace: sa.namespace}),
+              },
+            ];
+
+            return (
+              <ContextMenuTrigger key={`${sa.namespace}-${sa.name}`} items={menuItems}>
+                <TableRow>
+                  <TableCell className="font-medium">{sa.name}</TableCell>
+                  {showNamespaceColumn && <TableCell>{sa.namespace}</TableCell>}
+                  <TableCell>
+                    <Badge variant="secondary">{sa.secrets}</Badge>
+                  </TableCell>
+                  <TableCell>{sa.age}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end">
+                      <ContextMenu items={menuItems}>
+                        <MoreVertical className="w-4 h-4" />
+                      </ContextMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </ContextMenuTrigger>
+            );
+          })
         )}
       </TableBody>
     </Table>

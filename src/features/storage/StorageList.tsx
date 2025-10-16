@@ -14,7 +14,8 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, Code } from "lucide-react";
+import { RefreshCw, Search, X, MoreVertical } from "lucide-react";
+import { ContextMenu, ContextMenuItem, ContextMenuTrigger } from "../../components/ui/ContextMenu";
 import { YamlViewer } from "../../components/YamlViewer";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
 
@@ -218,43 +219,52 @@ function PersistentVolumesTable({ data, isLoading, error, searchQuery, onViewYam
             </TableCell>
           </TableRow>
         ) : (
-          data.map((pv: any) => (
-          <TableRow key={pv.name}>
-            <TableCell className="font-medium">{pv.name}</TableCell>
-            <TableCell>{pv.capacity}</TableCell>
-            <TableCell>
-              <div className="flex gap-1">
-                {pv.access_modes.map((mode: string) => (
-                  <Badge key={mode} variant="secondary" className="text-xs">
-                    {mode}
-                  </Badge>
-                ))}
-              </div>
-            </TableCell>
-            <TableCell>
-              <Badge variant="secondary">{pv.reclaim_policy}</Badge>
-            </TableCell>
-            <TableCell>
-              <Badge variant={getStatusVariant(pv.status)}>{pv.status}</Badge>
-            </TableCell>
-            <TableCell className="text-muted-foreground text-sm">
-              {pv.claim || "-"}
-            </TableCell>
-            <TableCell className="text-muted-foreground">
-              {pv.storage_class || "-"}
-            </TableCell>
-            <TableCell>{pv.age}</TableCell>
-            <TableCell className="text-right">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onViewYaml({name: pv.name})}
-              >
-                <Code className="w-4 h-4" />
-              </Button>
-            </TableCell>
-          </TableRow>
-          ))
+          data.map((pv: any) => {
+            const menuItems: ContextMenuItem[] = [
+              {
+                label: "View YAML",
+                onClick: () => onViewYaml({name: pv.name}),
+              },
+            ];
+
+            return (
+              <ContextMenuTrigger key={pv.name} items={menuItems}>
+                <TableRow>
+                  <TableCell className="font-medium">{pv.name}</TableCell>
+                  <TableCell>{pv.capacity}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      {pv.access_modes.map((mode: string) => (
+                        <Badge key={mode} variant="secondary" className="text-xs">
+                          {mode}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{pv.reclaim_policy}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={getStatusVariant(pv.status)}>{pv.status}</Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {pv.claim || "-"}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {pv.storage_class || "-"}
+                  </TableCell>
+                  <TableCell>{pv.age}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end">
+                      <ContextMenu items={menuItems}>
+                        <MoreVertical className="w-4 h-4" />
+                      </ContextMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </ContextMenuTrigger>
+            );
+          })
         )}
       </TableBody>
     </Table>
@@ -315,41 +325,50 @@ function PersistentVolumeClaimsTable({ data, isLoading, error, searchQuery, onVi
             </TableCell>
           </TableRow>
         ) : (
-          data.map((pvc: any) => (
-          <TableRow key={pvc.name}>
-            <TableCell className="font-medium">{pvc.name}</TableCell>
-            {showNamespaceColumn && <TableCell>{pvc.namespace}</TableCell>}
-            <TableCell>
-              <Badge variant={getStatusVariant(pvc.status)}>{pvc.status}</Badge>
-            </TableCell>
-            <TableCell className="text-muted-foreground">
-              {pvc.volume || "-"}
-            </TableCell>
-            <TableCell>{pvc.capacity || "Pending"}</TableCell>
-            <TableCell>
-              <div className="flex gap-1">
-                {pvc.access_modes.map((mode: string) => (
-                  <Badge key={mode} variant="secondary" className="text-xs">
-                    {mode}
-                  </Badge>
-                ))}
-              </div>
-            </TableCell>
-            <TableCell className="text-muted-foreground">
-              {pvc.storage_class || "-"}
-            </TableCell>
-            <TableCell>{pvc.age}</TableCell>
-            <TableCell className="text-right">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onViewYaml({name: pvc.name, namespace: pvc.namespace})}
-              >
-                <Code className="w-4 h-4" />
-              </Button>
-            </TableCell>
-          </TableRow>
-          ))
+          data.map((pvc: any) => {
+            const menuItems: ContextMenuItem[] = [
+              {
+                label: "View YAML",
+                onClick: () => onViewYaml({name: pvc.name, namespace: pvc.namespace}),
+              },
+            ];
+
+            return (
+              <ContextMenuTrigger key={pvc.name} items={menuItems}>
+                <TableRow>
+                  <TableCell className="font-medium">{pvc.name}</TableCell>
+                  {showNamespaceColumn && <TableCell>{pvc.namespace}</TableCell>}
+                  <TableCell>
+                    <Badge variant={getStatusVariant(pvc.status)}>{pvc.status}</Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {pvc.volume || "-"}
+                  </TableCell>
+                  <TableCell>{pvc.capacity || "Pending"}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      {pvc.access_modes.map((mode: string) => (
+                        <Badge key={mode} variant="secondary" className="text-xs">
+                          {mode}
+                        </Badge>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {pvc.storage_class || "-"}
+                  </TableCell>
+                  <TableCell>{pvc.age}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end">
+                      <ContextMenu items={menuItems}>
+                        <MoreVertical className="w-4 h-4" />
+                      </ContextMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </ContextMenuTrigger>
+            );
+          })
         )}
       </TableBody>
     </Table>

@@ -36,8 +36,10 @@ import {
   Copy,
   Hash,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  MoreVertical
 } from "lucide-react";
+import { ContextMenu, ContextMenuItem, ContextMenuTrigger } from "../../components/ui/ContextMenu";
 import { useAppStore } from "../../lib/store";
 import { useController } from "../../hooks/useControllerDetection";
 import { CustomResourceDescribeViewer } from "../../components/CustomResourceDescribeViewer";
@@ -1237,9 +1239,70 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
                     const pipelineData = isWorkflow ? getPipelineExecutionData(resource) : [];
                     const hasPipelineData = pipelineData.length > 0;
 
+                    // Build context menu items
+                    const menuItems: ContextMenuItem[] = [
+                      // View Details (for ArgoCD, Argo Workflows, Argo Events)
+                      ...((controllerId === "argocd" || controllerId === "argo-workflows" || controllerId === "argo-events") ? [{
+                        label: "View Details",
+                        icon: <Info className="w-4 h-4" />,
+                        onClick: () => {
+                          if (resource.kind === "Workflow") {
+                            setWorkflowViewMode("dag");
+                          }
+                          setDetailsResource(resource);
+                        }
+                      }] : []),
+                      // Sync Application (ArgoCD only)
+                      ...(controllerId === "argocd" && isApplication ? [{
+                        label: "Sync Application",
+                        icon: syncingResources.has(`${resource.namespace}-${resource.name}`) ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <RotateCw className="w-4 h-4" />
+                        ),
+                        onClick: () => handleSyncArgoApp(resource),
+                        disabled: syncingResources.has(`${resource.namespace}-${resource.name}`)
+                      }] : []),
+                      // Hard Refresh (ArgoCD only)
+                      ...(controllerId === "argocd" && isApplication ? [{
+                        label: "Hard Refresh",
+                        icon: hardRefreshingResources.has(`${resource.namespace}-${resource.name}`) ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Zap className="w-4 h-4" />
+                        ),
+                        onClick: () => handleHardRefreshArgoApp(resource),
+                        disabled: hardRefreshingResources.has(`${resource.namespace}-${resource.name}`)
+                      }] : []),
+                      // Separator before common actions
+                      ...((controllerId === "argocd" && isApplication) || controllerId === "argo-workflows" || controllerId === "argo-events" ? [{ separator: true }] : []),
+                      // Describe
+                      {
+                        label: "Describe",
+                        icon: <Eye className="w-4 h-4" />,
+                        onClick: () => setDescribeResource(resource)
+                      },
+                      // View YAML
+                      {
+                        label: "View YAML",
+                        icon: <FileText className="w-4 h-4" />,
+                        onClick: () => setYamlResource(resource)
+                      },
+                      // Separator before delete
+                      { separator: true },
+                      // Delete
+                      {
+                        label: "Delete",
+                        icon: <Trash2 className="w-4 h-4" />,
+                        onClick: () => handleDeleteResource(resource),
+                        variant: "danger" as const
+                      }
+                    ];
+
                     return (
                       <>
-                        <TableRow key={rowId}>
+                        <ContextMenuTrigger key={rowId} items={menuItems}>
+                          <TableRow>
                           <TableCell className="font-mono text-sm">
                             <div className="flex items-center gap-2">
                               {isWorkflow && hasPipelineData && (
@@ -1470,86 +1533,14 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
                         )}
                         <TableCell>{resource.age}</TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {(controllerId === "argocd" || controllerId === "argo-workflows" || controllerId === "argo-events") && (
-                              <Button
-                                onClick={() => {
-                                  // For Workflows, open DAG view directly
-                                  if (resource.kind === "Workflow") {
-                                    setWorkflowViewMode("dag");
-                                  }
-                                  setDetailsResource(resource);
-                                }}
-                                variant="ghost"
-                                size="sm"
-                                title="View Details"
-                              >
-                                <Info className="w-4 h-4" />
-                              </Button>
-                            )}
-                            {controllerId === "argocd" && (
-                              <>
-                                {isApplication && (
-                                  <>
-                                    <Button
-                                      onClick={() => handleSyncArgoApp(resource)}
-                                      variant="ghost"
-                                      size="sm"
-                                      title="Sync Application"
-                                      disabled={syncingResources.has(`${resource.namespace}-${resource.name}`)}
-                                    >
-                                      {syncingResources.has(`${resource.namespace}-${resource.name}`) ? (
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                      ) : (
-                                        <RotateCw className="w-4 h-4" />
-                                      )}
-                                    </Button>
-                                    <Button
-                                      onClick={() => handleHardRefreshArgoApp(resource)}
-                                      variant="ghost"
-                                      size="sm"
-                                      title="Hard Refresh (Sync with Prune)"
-                                      disabled={hardRefreshingResources.has(`${resource.namespace}-${resource.name}`)}
-                                      className="text-orange-600 hover:text-orange-700"
-                                    >
-                                      {hardRefreshingResources.has(`${resource.namespace}-${resource.name}`) ? (
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                      ) : (
-                                        <Zap className="w-4 h-4" />
-                                      )}
-                                    </Button>
-                                  </>
-                                )}
-                              </>
-                            )}
-                            <Button
-                              onClick={() => setDescribeResource(resource)}
-                              variant="ghost"
-                              size="sm"
-                              title="Describe"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              onClick={() => setYamlResource(resource)}
-                              variant="ghost"
-                              size="sm"
-                              title="View YAML"
-                            >
-                              <FileText className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              onClick={() => handleDeleteResource(resource)}
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:text-destructive"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                          <div className="flex items-center justify-end">
+                            <ContextMenu items={menuItems}>
+                              <MoreVertical className="w-4 h-4" />
+                            </ContextMenu>
                           </div>
                         </TableCell>
                       </TableRow>
+                        </ContextMenuTrigger>
 
                       {/* Expanded Row for Pipeline Execution Details */}
                       {isExpanded && hasPipelineData && (

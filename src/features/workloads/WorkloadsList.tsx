@@ -27,9 +27,10 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, FileText, RotateCw, Trash2, Pause, Play, Code, ScrollText } from "lucide-react";
+import { RefreshCw, Search, X, FileText, RotateCw, Trash2, Pause, Play, Code, ScrollText, MoreVertical } from "lucide-react";
 import { YamlViewer } from "../../components/YamlViewer";
 import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
+import { ContextMenu, ContextMenuTrigger, type ContextMenuItem } from "../../components/ui/ContextMenu";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { PodSelectorModal } from "../../components/PodSelectorModal";
@@ -475,115 +476,106 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
           ) : (
             data.map((sts: any) => {
             const metrics = getStatefulSetMetrics(sts.name, sts.namespace);
+
+            // Build context menu items for this statefulset
+            const menuItems: ContextMenuItem[] = [
+              {
+                label: "View YAML",
+                icon: <Code className="w-4 h-4" />,
+                onClick: () => onViewYaml({name: sts.name, namespace: sts.namespace})
+              },
+              {
+                label: "Describe",
+                icon: <FileText className="w-4 h-4" />,
+                onClick: () => setSelectedStatefulSetForDescribe({name: sts.name, namespace: sts.namespace})
+              },
+              {
+                label: "View Logs",
+                icon: <ScrollText className="w-4 h-4" />,
+                onClick: () => handleViewLogs(sts.name, sts.namespace),
+                disabled: loadingPodsFor === sts.name
+              },
+              {
+                label: "Restart",
+                icon: <RotateCw className="w-4 h-4" />,
+                onClick: () => handleRestartStatefulSet(sts.name),
+                disabled: restartingStatefulSet === sts.name
+              },
+              {
+                label: "Scale",
+                icon: <RefreshCw className="w-4 h-4" />,
+                onClick: () => handleScaleStatefulSet(sts.name, sts.replicas),
+                disabled: scalingStatefulSet === sts.name
+              },
+              { separator: true },
+              {
+                label: "Delete",
+                icon: <Trash2 className="w-4 h-4" />,
+                onClick: () => handleDeleteStatefulSet(sts.name),
+                variant: "danger" as const,
+                disabled: deleteStatefulSet.isPending
+              }
+            ];
+
             return (
-            <TableRow key={sts.name}>
-              <TableCell className="font-medium">{sts.name}</TableCell>
-              {showNamespaceColumn && <TableCell>{sts.namespace}</TableCell>}
-              <TableCell>
-                <Badge
-                  variant={
-                    sts.ready === `${sts.replicas}/${sts.replicas}`
-                      ? "success"
-                      : "warning"
-                  }
-                >
-                  {sts.ready}
-                </Badge>
-              </TableCell>
-              <TableCell>{sts.replicas}</TableCell>
-              {hasAdvancedMetrics && (
-                <>
-                  <TableCell>
-                    {metrics ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs font-medium">
-                          {formatCores(metrics.cpu)}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {metrics ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs font-medium">
-                          {formatBytes(metrics.memory)}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                </>
-              )}
-              <TableCell>{sts.age}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onViewYaml({name: sts.name, namespace: sts.namespace})}
-                    title="View YAML"
+            <ContextMenuTrigger key={sts.name} items={menuItems}>
+              <TableRow>
+                <TableCell className="font-medium">{sts.name}</TableCell>
+                {showNamespaceColumn && <TableCell>{sts.namespace}</TableCell>}
+                <TableCell>
+                  <Badge
+                    variant={
+                      sts.ready === `${sts.replicas}/${sts.replicas}`
+                        ? "success"
+                        : "warning"
+                    }
                   >
-                    <Code className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedStatefulSetForDescribe({name: sts.name, namespace: sts.namespace})}
-                    title="Describe"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleViewLogs(sts.name, sts.namespace)}
-                    disabled={loadingPodsFor === sts.name}
-                    title="View logs"
-                  >
-                    {loadingPodsFor === sts.name ? (
-                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <ScrollText className="w-4 h-4" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleRestartStatefulSet(sts.name)}
-                    disabled={restartingStatefulSet === sts.name}
-                  >
-                    <RotateCw className={`w-4 h-4 mr-2 ${restartingStatefulSet === sts.name ? "animate-spin" : ""}`} />
-                    Restart
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleScaleStatefulSet(sts.name, sts.replicas)}
-                    disabled={scalingStatefulSet === sts.name}
-                  >
-                    Scale
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteStatefulSet(sts.name)}
-                    disabled={deleteStatefulSet.isPending}
-                    title="Delete statefulset"
-                  >
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
+                    {sts.ready}
+                  </Badge>
+                </TableCell>
+                <TableCell>{sts.replicas}</TableCell>
+                {hasAdvancedMetrics && (
+                  <>
+                    <TableCell>
+                      {metrics ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-medium">
+                            {formatCores(metrics.cpu)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {metrics ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-medium">
+                            {formatBytes(metrics.memory)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                  </>
+                )}
+                <TableCell>{sts.age}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end">
+                    <ContextMenu items={menuItems}>
+                      <MoreVertical className="w-4 h-4" />
+                    </ContextMenu>
+                  </div>
+                </TableCell>
+              </TableRow>
+            </ContextMenuTrigger>
             );
             })
           )}
@@ -915,104 +907,97 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
           ) : (
             data.map((ds: any) => {
             const metrics = getDaemonSetMetrics(ds.name, ds.namespace);
+
+            // Build context menu items for this daemonset
+            const menuItems: ContextMenuItem[] = [
+              {
+                label: "View YAML",
+                icon: <Code className="w-4 h-4" />,
+                onClick: () => onViewYaml({name: ds.name, namespace: ds.namespace})
+              },
+              {
+                label: "Describe",
+                icon: <FileText className="w-4 h-4" />,
+                onClick: () => setSelectedDaemonSetForDescribe({name: ds.name, namespace: ds.namespace})
+              },
+              {
+                label: "View Logs",
+                icon: <ScrollText className="w-4 h-4" />,
+                onClick: () => handleViewLogsDaemonSet(ds.name, ds.namespace),
+                disabled: loadingPodsForDS === ds.name
+              },
+              {
+                label: "Restart",
+                icon: <RotateCw className="w-4 h-4" />,
+                onClick: () => handleRestartDaemonSet(ds.name),
+                disabled: restartingDaemonSet === ds.name
+              },
+              { separator: true },
+              {
+                label: "Delete",
+                icon: <Trash2 className="w-4 h-4" />,
+                onClick: () => handleDeleteDaemonSet(ds.name),
+                variant: "danger" as const,
+                disabled: deleteDaemonSet.isPending
+              }
+            ];
+
             return (
-            <TableRow key={ds.name}>
-              <TableCell className="font-medium">{ds.name}</TableCell>
-              {showNamespaceColumn && <TableCell>{ds.namespace}</TableCell>}
-              <TableCell>{ds.desired}</TableCell>
-              <TableCell>{ds.current}</TableCell>
-              <TableCell>
-                <Badge variant={ds.ready === ds.desired ? "success" : "warning"}>
-                  {ds.ready}
-                </Badge>
-              </TableCell>
-              <TableCell>{ds.up_to_date}</TableCell>
-              <TableCell>{ds.available}</TableCell>
-              {hasAdvancedMetrics && (
-                <>
-                  <TableCell>
-                    {metrics ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs font-medium">
-                          {formatCores(metrics.cpu)}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {metrics ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs font-medium">
-                          {formatBytes(metrics.memory)}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                </>
-              )}
-              <TableCell>{ds.age}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onViewYaml({name: ds.name, namespace: ds.namespace})}
-                    title="View YAML"
-                  >
-                    <Code className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedDaemonSetForDescribe({name: ds.name, namespace: ds.namespace})}
-                    title="Describe"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleViewLogsDaemonSet(ds.name, ds.namespace)}
-                    disabled={loadingPodsForDS === ds.name}
-                    title="View logs"
-                  >
-                    {loadingPodsForDS === ds.name ? (
-                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <ScrollText className="w-4 h-4" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleRestartDaemonSet(ds.name)}
-                    disabled={restartingDaemonSet === ds.name}
-                  >
-                    <RotateCw className={`w-4 h-4 mr-2 ${restartingDaemonSet === ds.name ? "animate-spin" : ""}`} />
-                    Restart
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteDaemonSet(ds.name)}
-                    disabled={deleteDaemonSet.isPending}
-                    title="Delete daemonset"
-                  >
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
+            <ContextMenuTrigger key={ds.name} items={menuItems}>
+              <TableRow>
+                <TableCell className="font-medium">{ds.name}</TableCell>
+                {showNamespaceColumn && <TableCell>{ds.namespace}</TableCell>}
+                <TableCell>{ds.desired}</TableCell>
+                <TableCell>{ds.current}</TableCell>
+                <TableCell>
+                  <Badge variant={ds.ready === ds.desired ? "success" : "warning"}>
+                    {ds.ready}
+                  </Badge>
+                </TableCell>
+                <TableCell>{ds.up_to_date}</TableCell>
+                <TableCell>{ds.available}</TableCell>
+                {hasAdvancedMetrics && (
+                  <>
+                    <TableCell>
+                      {metrics ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-medium">
+                            {formatCores(metrics.cpu)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {metrics ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-medium">
+                            {formatBytes(metrics.memory)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                  </>
+                )}
+                <TableCell>{ds.age}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end">
+                    <ContextMenu items={menuItems}>
+                      <MoreVertical className="w-4 h-4" />
+                    </ContextMenu>
+                  </div>
+                </TableCell>
+              </TableRow>
+            </ContextMenuTrigger>
             );
             })
           )}
@@ -1206,72 +1191,69 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
               </TableCell>
             </TableRow>
           ) : (
-            data.map((job: any) => (
-            <TableRow key={job.name}>
-              <TableCell className="font-medium">{job.name}</TableCell>
-              {showNamespaceColumn && <TableCell>{job.namespace}</TableCell>}
-              <TableCell>{job.completions}</TableCell>
-              <TableCell>
-                {job.active > 0 && (
-                  <Badge variant="warning">{job.active}</Badge>
-                )}
-              </TableCell>
-              <TableCell>
-                {job.succeeded > 0 && (
-                  <Badge variant="success">{job.succeeded}</Badge>
-                )}
-              </TableCell>
-              <TableCell>
-                {job.failed > 0 && (
-                  <Badge variant="destructive">{job.failed}</Badge>
-                )}
-              </TableCell>
-              <TableCell>{job.duration}</TableCell>
-              <TableCell>{job.age}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onViewYaml({name: job.name, namespace: job.namespace})}
-                    title="View YAML"
-                  >
-                    <Code className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedJobForDescribe({name: job.name, namespace: job.namespace})}
-                    title="Describe"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleViewLogsJob(job.name, job.namespace)}
-                    disabled={loadingPodsForJob === job.name}
-                    title="View logs"
-                  >
-                    {loadingPodsForJob === job.name ? (
-                      <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <ScrollText className="w-4 h-4" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteJob(job.name)}
-                    disabled={deleteJob.isPending}
-                    title="Delete job"
-                  >
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-            ))
+            data.map((job: any) => {
+              // Build context menu items for this job
+              const menuItems: ContextMenuItem[] = [
+                {
+                  label: "View YAML",
+                  icon: <Code className="w-4 h-4" />,
+                  onClick: () => onViewYaml({name: job.name, namespace: job.namespace})
+                },
+                {
+                  label: "Describe",
+                  icon: <FileText className="w-4 h-4" />,
+                  onClick: () => setSelectedJobForDescribe({name: job.name, namespace: job.namespace})
+                },
+                {
+                  label: "View Logs",
+                  icon: <ScrollText className="w-4 h-4" />,
+                  onClick: () => handleViewLogsJob(job.name, job.namespace),
+                  disabled: loadingPodsForJob === job.name
+                },
+                { separator: true },
+                {
+                  label: "Delete",
+                  icon: <Trash2 className="w-4 h-4" />,
+                  onClick: () => handleDeleteJob(job.name),
+                  variant: "danger" as const,
+                  disabled: deleteJob.isPending
+                }
+              ];
+
+              return (
+                <ContextMenuTrigger key={job.name} items={menuItems}>
+                  <TableRow>
+                    <TableCell className="font-medium">{job.name}</TableCell>
+                    {showNamespaceColumn && <TableCell>{job.namespace}</TableCell>}
+                    <TableCell>{job.completions}</TableCell>
+                    <TableCell>
+                      {job.active > 0 && (
+                        <Badge variant="warning">{job.active}</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {job.succeeded > 0 && (
+                        <Badge variant="success">{job.succeeded}</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {job.failed > 0 && (
+                        <Badge variant="destructive">{job.failed}</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>{job.duration}</TableCell>
+                    <TableCell>{job.age}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end">
+                        <ContextMenu items={menuItems}>
+                          <MoreVertical className="w-4 h-4" />
+                        </ContextMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </ContextMenuTrigger>
+              );
+            })
           )}
         </TableBody>
       </Table>
@@ -1469,81 +1451,73 @@ function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any)
               </TableCell>
             </TableRow>
           ) : (
-            data.map((cj: any) => (
-            <TableRow key={cj.name}>
-              <TableCell className="font-medium">{cj.name}</TableCell>
-              {showNamespaceColumn && <TableCell>{cj.namespace}</TableCell>}
-              <TableCell>
-                <code className="text-sm bg-muted px-2 py-1 rounded">
-                  {cj.schedule}
-                </code>
-              </TableCell>
-              <TableCell>
-                <Badge variant={cj.suspend ? "warning" : "success"}>
-                  {cj.suspend ? "Yes" : "No"}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                {cj.active > 0 && <Badge variant="success">{cj.active}</Badge>}
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {cj.last_schedule || "Never"}
-              </TableCell>
-              <TableCell>{cj.age}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onViewYaml({name: cj.name, namespace: cj.namespace})}
-                    title="View YAML"
-                  >
-                    <Code className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSelectedCronJobForDescribe({name: cj.name, namespace: cj.namespace})}
-                    title="Describe"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </Button>
-                  {cj.suspend ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleResumeCronJob(cj.name)}
-                      disabled={resumingCronJob === cj.name}
-                      title="Resume cronjob"
-                    >
-                      <Play className={`w-4 h-4 mr-2 ${resumingCronJob === cj.name ? "animate-pulse" : ""}`} />
-                      Resume
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleSuspendCronJob(cj.name)}
-                      disabled={suspendingCronJob === cj.name}
-                      title="Suspend cronjob"
-                    >
-                      <Pause className={`w-4 h-4 mr-2 ${suspendingCronJob === cj.name ? "animate-pulse" : ""}`} />
-                      Suspend
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteCronJob(cj.name)}
-                    disabled={deleteCronJob.isPending}
-                    title="Delete cronjob"
-                  >
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-            ))
+            data.map((cj: any) => {
+              // Build context menu items for this cronjob
+              const menuItems: ContextMenuItem[] = [
+                {
+                  label: "View YAML",
+                  icon: <Code className="w-4 h-4" />,
+                  onClick: () => onViewYaml({name: cj.name, namespace: cj.namespace})
+                },
+                {
+                  label: "Describe",
+                  icon: <FileText className="w-4 h-4" />,
+                  onClick: () => setSelectedCronJobForDescribe({name: cj.name, namespace: cj.namespace})
+                },
+                ...(cj.suspend ? [{
+                  label: "Resume",
+                  icon: <Play className="w-4 h-4" />,
+                  onClick: () => handleResumeCronJob(cj.name),
+                  disabled: resumingCronJob === cj.name
+                }] : [{
+                  label: "Suspend",
+                  icon: <Pause className="w-4 h-4" />,
+                  onClick: () => handleSuspendCronJob(cj.name),
+                  disabled: suspendingCronJob === cj.name
+                }]),
+                { separator: true },
+                {
+                  label: "Delete",
+                  icon: <Trash2 className="w-4 h-4" />,
+                  onClick: () => handleDeleteCronJob(cj.name),
+                  variant: "danger" as const,
+                  disabled: deleteCronJob.isPending
+                }
+              ];
+
+              return (
+                <ContextMenuTrigger key={cj.name} items={menuItems}>
+                  <TableRow>
+                    <TableCell className="font-medium">{cj.name}</TableCell>
+                    {showNamespaceColumn && <TableCell>{cj.namespace}</TableCell>}
+                    <TableCell>
+                      <code className="text-sm bg-muted px-2 py-1 rounded">
+                        {cj.schedule}
+                      </code>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={cj.suspend ? "warning" : "success"}>
+                        {cj.suspend ? "Yes" : "No"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {cj.active > 0 && <Badge variant="success">{cj.active}</Badge>}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {cj.last_schedule || "Never"}
+                    </TableCell>
+                    <TableCell>{cj.age}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end">
+                        <ContextMenu items={menuItems}>
+                          <MoreVertical className="w-4 h-4" />
+                        </ContextMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </ContextMenuTrigger>
+              );
+            })
           )}
         </TableBody>
       </Table>

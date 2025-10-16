@@ -10,12 +10,13 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, Code, ArrowRightLeft, Trash2, FileText, ChevronDown, ChevronRight, Network } from "lucide-react";
+import { RefreshCw, Search, X, Code, ArrowRightLeft, Trash2, FileText, ChevronDown, ChevronRight, Network, MoreVertical } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { YamlViewer } from "../../components/YamlViewer";
 import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
 import { PortForwardModal } from "../../components/PortForwardModal";
 import { PodInfo, ServiceInfo } from "../../types";
+import { ContextMenu, ContextMenuTrigger, type ContextMenuItem } from "../../components/ui/ContextMenu";
 
 // Utility function to check if a service selector matches pod labels
 function serviceSelectorMatchesPodLabels(
@@ -257,7 +258,7 @@ export function ServicesList() {
         <TableBody>
           {filteredServices.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={9 + (showNamespaceColumn ? 1 : 0)} className="text-center py-8 text-muted-foreground">
                 {searchQuery ? `No services found matching "${searchQuery}"` : "No services found"}
               </TableCell>
             </TableRow>
@@ -267,87 +268,84 @@ export function ServicesList() {
               const isExpanded = expandedServices.has(service.name);
               const colSpan = showNamespaceColumn ? 10 : 9;
 
+              // Build context menu items for this service
+              const menuItems: ContextMenuItem[] = [
+                ...(service.ports && service.ports !== "-" ? [{
+                  label: "Port Forward",
+                  icon: <ArrowRightLeft className="w-4 h-4" />,
+                  onClick: () => setSelectedServiceForPortForward({name: service.name, namespace: service.namespace})
+                }] : []),
+                {
+                  label: "View YAML",
+                  icon: <Code className="w-4 h-4" />,
+                  onClick: () => setSelectedResource({name: service.name, namespace: service.namespace})
+                },
+                {
+                  label: "Describe",
+                  icon: <FileText className="w-4 h-4" />,
+                  onClick: () => setSelectedServiceForDescribe({name: service.name, namespace: service.namespace})
+                },
+                { separator: true },
+                {
+                  label: "Delete",
+                  icon: <Trash2 className="w-4 h-4" />,
+                  onClick: () => handleDelete(service.name),
+                  variant: "danger" as const,
+                  disabled: deleteService.isPending
+                }
+              ];
+
               return [
                 // Main service row
-                <TableRow key={service.name}>
-                  <TableCell>
-                    {matchedPods.length > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => toggleServiceExpand(service.name)}
-                        className="h-6 w-6"
-                      >
-                        {isExpanded ? (
-                          <ChevronDown className="w-4 h-4" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4" />
-                        )}
-                      </Button>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-medium">{service.name}</TableCell>
-                  {showNamespaceColumn && <TableCell>{service.namespace}</TableCell>}
-                  <TableCell>
-                    <Badge variant={getTypeVariant(service.service_type)}>
-                      {service.service_type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {service.cluster_ip}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm text-muted-foreground">
-                    {service.external_ip || "-"}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">
-                    {service.ports}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={matchedPods.length > 0 ? "default" : "secondary"}>
-                      {matchedPods.length} {matchedPods.length === 1 ? "pod" : "pods"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{service.age}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {service.ports && service.ports !== "-" && (
+                <ContextMenuTrigger key={service.name} items={menuItems}>
+                  <TableRow>
+                    <TableCell>
+                      {matchedPods.length > 0 && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setSelectedServiceForPortForward({name: service.name, namespace: service.namespace})}
-                          title={`Port Forward (${service.ports})`}
+                          onClick={() => toggleServiceExpand(service.name)}
+                          className="h-6 w-6"
                         >
-                          <ArrowRightLeft className="w-4 h-4" />
+                          {isExpanded ? (
+                            <ChevronDown className="w-4 h-4" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4" />
+                          )}
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSelectedResource({name: service.name, namespace: service.namespace})}
-                        title="View YAML"
-                      >
-                        <Code className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSelectedServiceForDescribe({name: service.name, namespace: service.namespace})}
-                        title="Describe"
-                      >
-                        <FileText className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(service.name)}
-                        disabled={deleteService.isPending}
-                        title="Delete service"
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>,
+                    </TableCell>
+                    <TableCell className="font-medium">{service.name}</TableCell>
+                    {showNamespaceColumn && <TableCell>{service.namespace}</TableCell>}
+                    <TableCell>
+                      <Badge variant={getTypeVariant(service.service_type)}>
+                        {service.service_type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {service.cluster_ip}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm text-muted-foreground">
+                      {service.external_ip || "-"}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {service.ports}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={matchedPods.length > 0 ? "default" : "secondary"}>
+                        {matchedPods.length} {matchedPods.length === 1 ? "pod" : "pods"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{service.age}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end">
+                        <ContextMenu items={menuItems}>
+                          <MoreVertical className="w-4 h-4" />
+                        </ContextMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </ContextMenuTrigger>,
                 // Expandable row for visual flow
                 ...(isExpanded && matchedPods.length > 0
                   ? [

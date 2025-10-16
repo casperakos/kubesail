@@ -11,7 +11,8 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, FileText, RotateCw, Trash2, Code, ScrollText } from "lucide-react";
+import { RefreshCw, Search, X, FileText, RotateCw, Trash2, Code, ScrollText, MoreVertical, Scale } from "lucide-react";
+import { ContextMenu, ContextMenuItem, ContextMenuTrigger } from "../../components/ui/ContextMenu";
 import { useState, useMemo } from "react";
 import { YamlViewer } from "../../components/YamlViewer";
 import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
@@ -344,7 +345,7 @@ export function DeploymentsList() {
         <TableBody>
           {filteredDeployments.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={6 + (showNamespaceColumn ? 1 : 0) + (hasAdvancedMetrics ? 2 : 0)} className="text-center py-8 text-muted-foreground">
                 {searchQuery ? `No deployments found matching "${searchQuery}"` : "No deployments found"}
               </TableCell>
             </TableRow>
@@ -353,110 +354,104 @@ export function DeploymentsList() {
             const [ready, total] = deployment.ready.split("/").map(Number);
             const metrics = getDeploymentMetrics(deployment.name, deployment.namespace);
 
+            const menuItems: ContextMenuItem[] = [
+              {
+                label: "View YAML",
+                icon: <Code className="w-4 h-4" />,
+                onClick: () => setSelectedDeployment({name: deployment.name, namespace: deployment.namespace})
+              },
+              {
+                label: "Describe",
+                icon: <FileText className="w-4 h-4" />,
+                onClick: () => setSelectedDeploymentForDescribe({name: deployment.name, namespace: deployment.namespace})
+              },
+              {
+                label: "View Logs",
+                icon: loadingPodsFor === deployment.name ? (
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <ScrollText className="w-4 h-4" />
+                ),
+                onClick: () => handleViewLogs(deployment.name, deployment.namespace),
+                disabled: loadingPodsFor === deployment.name
+              },
+              { separator: true },
+              {
+                label: "Restart",
+                icon: <RotateCw className="w-4 h-4" />,
+                onClick: () => handleRestart(deployment.name),
+                disabled: restartingDeployment === deployment.name
+              },
+              {
+                label: "Scale",
+                icon: <Scale className="w-4 h-4" />,
+                onClick: () => handleScale(deployment.name, total),
+                disabled: scalingDeployment === deployment.name
+              },
+              { separator: true },
+              {
+                label: "Delete",
+                icon: <Trash2 className="w-4 h-4" />,
+                onClick: () => handleDelete(deployment.name),
+                variant: "danger" as const,
+                disabled: deleteDeployment.isPending
+              }
+            ];
+
             return (
-              <TableRow key={deployment.name}>
-                <TableCell className="font-medium">{deployment.name}</TableCell>
-                {showNamespaceColumn && <TableCell>{deployment.namespace}</TableCell>}
-                <TableCell>
-                  <Badge variant={ready === total ? "success" : "warning"}>
-                    {deployment.ready}
-                  </Badge>
-                </TableCell>
-                <TableCell>{deployment.up_to_date}</TableCell>
-                <TableCell>{deployment.available}</TableCell>
-                {hasAdvancedMetrics && (
-                  <>
-                    <TableCell>
-                      {metrics ? (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs font-medium">
-                            {formatCores(metrics.cpu)}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {metrics ? (
-                        <div className="flex flex-col gap-1">
-                          <span className="text-xs font-medium">
-                            {formatBytes(metrics.memory)}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                  </>
-                )}
-                <TableCell>{deployment.age}</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedDeployment({name: deployment.name, namespace: deployment.namespace})}
-                      title="View YAML"
-                    >
-                      <Code className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedDeploymentForDescribe({name: deployment.name, namespace: deployment.namespace})}
-                      title="Describe"
-                    >
-                      <FileText className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleViewLogs(deployment.name, deployment.namespace)}
-                      disabled={loadingPodsFor === deployment.name}
-                      title="View logs"
-                    >
-                      {loadingPodsFor === deployment.name ? (
-                        <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <ScrollText className="w-4 h-4" />
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRestart(deployment.name)}
-                      disabled={restartingDeployment === deployment.name}
-                    >
-                      <RotateCw className={`w-4 h-4 mr-2 ${restartingDeployment === deployment.name ? "animate-spin" : ""}`} />
-                      Restart
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleScale(deployment.name, total)}
-                      disabled={scalingDeployment === deployment.name}
-                    >
-                      Scale
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(deployment.name)}
-                      disabled={deleteDeployment.isPending}
-                      title="Delete deployment"
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
+              <ContextMenuTrigger key={deployment.name} items={menuItems}>
+                <TableRow>
+                  <TableCell className="font-medium">{deployment.name}</TableCell>
+                  {showNamespaceColumn && <TableCell>{deployment.namespace}</TableCell>}
+                  <TableCell>
+                    <Badge variant={ready === total ? "success" : "warning"}>
+                      {deployment.ready}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{deployment.up_to_date}</TableCell>
+                  <TableCell>{deployment.available}</TableCell>
+                  {hasAdvancedMetrics && (
+                    <>
+                      <TableCell>
+                        {metrics ? (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs font-medium">
+                              {formatCores(metrics.cpu)}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {metrics ? (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs font-medium">
+                              {formatBytes(metrics.memory)}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                    </>
+                  )}
+                  <TableCell>{deployment.age}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end">
+                      <ContextMenu items={menuItems}>
+                        <MoreVertical className="w-4 h-4" />
+                      </ContextMenu>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </ContextMenuTrigger>
             );
             })
           )}

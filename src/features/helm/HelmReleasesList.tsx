@@ -24,11 +24,13 @@ import {
   Clock,
   XCircle,
   Loader2,
+  MoreVertical,
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import { api } from "../../lib/api";
 import type { HelmRelease } from "../../types";
 import { HelmReleaseDetailsModal } from "./HelmReleaseDetailsModal";
+import { ContextMenu, ContextMenuTrigger, type ContextMenuItem } from "../../components/ui/ContextMenu";
 
 export function HelmReleasesList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
@@ -248,62 +250,53 @@ export function HelmReleasesList() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredReleases.map((release) => (
-                <TableRow
-                  key={`${release.namespace}-${release.name}`}
-                  className="hover:bg-muted/30 transition-colors cursor-pointer"
-                  onClick={() => setSelectedRelease(release)}
-                >
-                  <TableCell className="font-medium">{release.name}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="font-mono text-xs">
-                      {release.namespace}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-mono text-sm">{release.chart}</TableCell>
-                  <TableCell className="text-muted-foreground">{release.app_version || "—"}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="font-mono">
-                      {release.revision}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{getStatusBadge(release.status)}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{release.updated}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedRelease(release);
-                        }}
-                        className="h-8 w-8 p-0"
-                        title="View Details"
-                      >
-                        <FileText className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setReleaseToDelete(release);
-                        }}
-                        disabled={deletingRelease === release.name}
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        title="Uninstall"
-                      >
-                        {deletingRelease === release.name ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+              filteredReleases.map((release) => {
+                // Build context menu items for this release
+                const menuItems: ContextMenuItem[] = [
+                  {
+                    label: "View Details",
+                    icon: <FileText className="w-4 h-4" />,
+                    onClick: () => setSelectedRelease(release)
+                  },
+                  { separator: true },
+                  {
+                    label: "Uninstall",
+                    icon: <Trash2 className="w-4 h-4" />,
+                    onClick: () => setReleaseToDelete(release),
+                    variant: "danger" as const,
+                    disabled: deletingRelease === release.name
+                  }
+                ];
+
+                return (
+                  <ContextMenuTrigger key={`${release.namespace}-${release.name}`} items={menuItems}>
+                    <TableRow className="hover:bg-muted/30 transition-colors cursor-pointer">
+                      <TableCell className="font-medium">{release.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="font-mono text-xs">
+                          {release.namespace}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{release.chart}</TableCell>
+                      <TableCell className="text-muted-foreground">{release.app_version || "—"}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="font-mono">
+                          {release.revision}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(release.status)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{release.updated}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end">
+                          <ContextMenu items={menuItems}>
+                            <MoreVertical className="w-4 h-4" />
+                          </ContextMenu>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  </ContextMenuTrigger>
+                );
+              })
             )}
           </TableBody>
         </Table>

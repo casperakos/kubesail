@@ -23,6 +23,7 @@ import { CRDsList } from "./features/crds/CRDsList";
 import { HelmReleasesList } from "./features/helm/HelmReleasesList";
 import { ControllerPage } from "./features/controllers/ControllerPage";
 import { Settings } from "./features/settings/Settings";
+import { NamespacesList } from "./features/namespaces/NamespacesList";
 import { useAppStore } from "./lib/store";
 import { ToastContainer } from "./components/Toast";
 
@@ -110,11 +111,7 @@ function MainContent() {
         {currentView === "argo-workflows-workflows" && <ControllerPage controllerId="argo-workflows" defaultCRDKind="Workflow" />}
         {currentView === "argo-events" && <ControllerPage controllerId="argo-events" />}
         {currentView === "settings" && <Settings />}
-        {currentView === "namespaces" && (
-          <div className="p-8 text-center text-muted-foreground">
-            Namespaces view coming soon...
-          </div>
-        )}
+        {currentView === "namespaces" && <NamespacesList />}
       </main>
     </div>
   );
