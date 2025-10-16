@@ -72,37 +72,64 @@ export function ClusterSelector() {
   const [newConfigName, setNewConfigName] = useState("");
   const [newConfigPath, setNewConfigPath] = useState("");
   const [editingConfigId, setEditingConfigId] = useState<string | null>(null);
+  const [switchInProgress, setSwitchInProgress] = useState(false);
 
-  const loadContexts = async () => {
+  const loadContexts = async (forceReload: boolean = false) => {
     try {
-      // Build KUBECONFIG path from all saved locations
-      // Expand tilde in paths before using them
-      const expandedPaths = await Promise.all(
-        savedKubeconfigs.map(async (c) => await expandTildePath(c.path))
-      );
-
-      // If we have saved paths, set KUBECONFIG to include all of them
-      if (expandedPaths.length > 0) {
-        const kubeconfigValue = expandedPaths.join(':');
-        console.log("Loading contexts from:", kubeconfigValue);
-        await invoke("load_custom_kubeconfig_file", { path: kubeconfigValue });
-      }
-
+      console.log("Fetching contexts from backend...");
       const [ctxs, current] = await Promise.all([
         invoke<ContextInfo[]>("get_kubeconfig_contexts"),
         invoke<ContextInfo | null>("get_current_context_info"),
       ]);
+
+      console.log("Loaded contexts:", ctxs.length, "contexts", ctxs);
+      console.log("Current context:", current);
+
       setContexts(ctxs);
       setCurrentContext(current);
       setError(null);
     } catch (err) {
+      console.error("Error loading contexts:", err);
       setError(err instanceof Error ? err.message : "Failed to load contexts");
+      // Don't clear contexts on error unless it's a force reload
+      if (forceReload) {
+        setContexts([]);
+        setCurrentContext(null);
+      }
     }
   };
 
+  // Load kubeconfig files once on component mount, then load contexts
   useEffect(() => {
-    loadContexts();
+    const loadKubeconfigFilesAndContexts = async () => {
+      try {
+        const expandedPaths = await Promise.all(
+          savedKubeconfigs.map(async (c) => await expandTildePath(c.path))
+        );
+
+        if (expandedPaths.length > 0) {
+          const kubeconfigValue = expandedPaths.join(':');
+          console.log("Setting kubeconfig paths:", kubeconfigValue);
+          await invoke("load_custom_kubeconfig_file", { path: kubeconfigValue });
+          console.log("Kubeconfig paths set successfully");
+        }
+
+        // Now load contexts after kubeconfig files are set
+        await loadContexts();
+      } catch (err) {
+        console.error("Failed to set kubeconfig paths:", err);
+      }
+    };
+
+    loadKubeconfigFilesAndContexts();
   }, [savedKubeconfigs]);
+
+  // Also load contexts when modal is opened to ensure fresh data
+  useEffect(() => {
+    if (showModal) {
+      loadContexts();
+    }
+  }, [showModal]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -116,12 +143,34 @@ export function ClusterSelector() {
   }, [showModal]);
 
   const handleSwitchContext = async (contextName: string) => {
+    // Don't allow switching if we don't have contexts loaded
+    if (contexts.length === 0) {
+      console.error("Cannot switch context: no contexts loaded");
+      setError("Please wait for contexts to load before switching");
+      return;
+    }
+
+    // Don't allow switching if another switch is already in progress
+    if (switchInProgress) {
+      console.error("Cannot switch context: another switch is in progress");
+      setError("Another context switch is in progress. Please refresh the page if you cancelled authentication.");
+      return;
+    }
+
+    setSwitchInProgress(true);
     setLoading(true);
     setError(null);
 
-    // Create a timeout promise
+    // Store current state before attempting switch
+    const previousContexts = [...contexts];
+    const previousCurrentContext = currentContext;
+
+    console.log("Attempting to switch to context:", contextName);
+    console.log("Current contexts count:", previousContexts.length);
+
+    // Create a timeout promise (10 seconds - enough time for auth but not too long if cancelled)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Operation timed out - authentication may have been cancelled")), 30000);
+      setTimeout(() => reject(new Error("Operation timed out - authentication may have been cancelled")), 10000);
     });
 
     try {
@@ -132,11 +181,21 @@ export function ClusterSelector() {
       ]);
       await loadContexts();
       setShowModal(false);
+      setSwitchInProgress(false);
       // Reload the page to refresh all data
       window.location.reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to switch context");
+      const errorMessage = err instanceof Error ? err.message : "Failed to switch context";
+      console.error("Context switch error:", errorMessage);
+      console.log("Restoring previous state with", previousContexts.length, "contexts");
+
+      // Immediately restore the previous state - don't try to reload from backend
+      // as the backend state might be corrupted by the failed switch
+      setContexts(previousContexts);
+      setCurrentContext(previousCurrentContext);
+      setError(errorMessage + " - You can try another context, but if it also fails, please refresh the page");
       setLoading(false);
+      setSwitchInProgress(false);
     }
   };
 
@@ -223,7 +282,7 @@ export function ClusterSelector() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Button onClick={loadContexts} variant="ghost" size="sm" disabled={loading}>
+                <Button onClick={() => loadContexts(true)} variant="ghost" size="sm" disabled={loading} title="Force reload contexts">
                   <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                 </Button>
                 <Button onClick={() => setShowModal(false)} variant="ghost" size="sm">
@@ -249,12 +308,12 @@ export function ClusterSelector() {
                   <button
                     key={context.name}
                     onClick={() => handleSwitchContext(context.name)}
-                    disabled={loading || context.current}
+                    disabled={loading || context.current || switchInProgress}
                     className={`w-full p-4 rounded-xl border transition-all duration-200 text-left ${
                       context.current
                         ? "bg-gradient-to-r from-slate-500/10 to-zinc-500/10 border-primary/20 shadow-sm"
                         : "bg-background/50 border-border/50 hover:border-primary/30 hover:shadow-md"
-                    } ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+                    } ${(loading || switchInProgress) ? "opacity-50 cursor-not-allowed" : ""}`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
