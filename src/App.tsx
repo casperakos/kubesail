@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { TitleBar } from "./components/TitleBar";
 import { Sidebar } from "./components/Sidebar";
 import { ClusterSelector } from "./components/ClusterSelector";
 import { NamespaceSelector } from "./components/NamespaceSelector";
@@ -21,6 +22,7 @@ import { PortForwardsPage } from "./features/portforwards/PortForwardsPage";
 import { CRDsList } from "./features/crds/CRDsList";
 import { HelmReleasesList } from "./features/helm/HelmReleasesList";
 import { ControllerPage } from "./features/controllers/ControllerPage";
+import { Settings } from "./features/settings/Settings";
 import { useAppStore } from "./lib/store";
 
 const queryClient = new QueryClient({
@@ -50,12 +52,14 @@ function MainContent() {
 
   return (
     <div className="flex-1 flex flex-col h-screen overflow-hidden">
+      <TitleBar />
+
       <CommandPalette
         open={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
       />
 
-      <header className="border-b border-border/50 bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between shadow-sm sticky top-0 z-40">
+      <header className="bg-gradient-to-r from-background/95 to-background/80 backdrop-blur-xl px-6 py-4 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-4">
           <ClusterSelector />
           <div className="h-8 w-px bg-border/50"></div>
@@ -83,10 +87,10 @@ function MainContent() {
         {currentView === "gateways" && <GatewaysPage />}
         {currentView === "configmaps" && <ConfigMapsList />}
         {currentView === "secrets" && <SecretsList />}
-        {currentView === "statefulsets" && <WorkloadsList />}
-        {currentView === "daemonsets" && <WorkloadsList />}
-        {currentView === "jobs" && <WorkloadsList />}
-        {currentView === "cronjobs" && <WorkloadsList />}
+        {currentView === "statefulsets" && <WorkloadsList defaultTab="statefulsets" />}
+        {currentView === "daemonsets" && <WorkloadsList defaultTab="daemonsets" />}
+        {currentView === "jobs" && <WorkloadsList defaultTab="jobs" />}
+        {currentView === "cronjobs" && <WorkloadsList defaultTab="cronjobs" />}
         {currentView === "storage" && <StorageList />}
         {currentView === "rbac" && <RBACList />}
         {currentView === "nodes" && <NodesList />}
@@ -95,13 +99,16 @@ function MainContent() {
         {currentView === "crds" && <CRDsList />}
         {currentView === "helm" && <HelmReleasesList />}
         {currentView === "argocd" && <ControllerPage controllerId="argocd" />}
+        {currentView === "argocd-applications" && <ControllerPage controllerId="argocd" defaultCRDKind="Application" />}
         {currentView === "flux" && <ControllerPage controllerId="flux" />}
         {currentView === "external-secrets" && <ControllerPage controllerId="external-secrets" />}
         {currentView === "sealed-secrets" && <ControllerPage controllerId="sealed-secrets" />}
         {currentView === "cert-manager" && <ControllerPage controllerId="cert-manager" />}
         {currentView === "crossplane" && <ControllerPage controllerId="crossplane" />}
         {currentView === "argo-workflows" && <ControllerPage controllerId="argo-workflows" />}
+        {currentView === "argo-workflows-workflows" && <ControllerPage controllerId="argo-workflows" defaultCRDKind="Workflow" />}
         {currentView === "argo-events" && <ControllerPage controllerId="argo-events" />}
+        {currentView === "settings" && <Settings />}
         {currentView === "namespaces" && (
           <div className="p-8 text-center text-muted-foreground">
             Namespaces view coming soon...

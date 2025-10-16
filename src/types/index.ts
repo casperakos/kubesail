@@ -28,6 +28,8 @@ export interface PodInfo {
   node?: string;
   ip?: string;
   ports: number[];
+  labels?: Record<string, string>;
+  annotations?: Record<string, string>;
 }
 
 export interface DeploymentInfo {
@@ -46,6 +48,7 @@ export interface ServiceInfo {
   cluster_ip: string;
   external_ip?: string;
   ports: string;
+  selector?: Record<string, string>;
   age: string;
 }
 
@@ -63,6 +66,19 @@ export interface IngressInfo {
   addresses: string[];
   age: string;
   tls: boolean;
+  rules: IngressRule[];
+}
+
+export interface IngressRule {
+  host: string;
+  paths: IngressPath[];
+}
+
+export interface IngressPath {
+  path: string;
+  path_type: string;
+  service: string;
+  port: string;
 }
 
 export interface IstioVirtualServiceInfo {
@@ -71,6 +87,21 @@ export interface IstioVirtualServiceInfo {
   hosts: string[];
   gateways: string[];
   age: string;
+  routes: VirtualServiceRoute[];
+}
+
+export interface VirtualServiceRoute {
+  match_conditions: RouteMatch[];
+  destination_host: string;
+  destination_port?: number;
+  weight?: number;
+}
+
+export interface RouteMatch {
+  uri_prefix?: string;
+  uri_exact?: string;
+  uri_regex?: string;
+  headers: string[];
 }
 
 export interface IstioGatewayInfo {
@@ -217,13 +248,16 @@ export type ResourceType =
   | "crds"
   | "helm"
   | "argocd"
+  | "argocd-applications"
   | "flux"
   | "external-secrets"
   | "sealed-secrets"
   | "cert-manager"
   | "crossplane"
   | "argo-workflows"
-  | "argo-events";
+  | "argo-workflows-workflows"
+  | "argo-events"
+  | "settings";
 
 // RBAC Types
 export interface SubjectInfo {
@@ -295,11 +329,17 @@ export interface AppState {
   currentNamespace: string;
   currentView: ResourceType;
   theme: "light" | "dark";
+  podSearchFilter?: string;
+  deploymentSearchFilter?: string;
+  serviceSearchFilter?: string;
   setCurrentContext: (context?: string) => void;
   setCurrentNamespace: (namespace: string) => void;
   setCurrentView: (view: ResourceType) => void;
   setTheme: (theme: "light" | "dark") => void;
   toggleTheme: () => void;
+  setPodSearchFilter: (filter?: string) => void;
+  setDeploymentSearchFilter: (filter?: string) => void;
+  setServiceSearchFilter: (filter?: string) => void;
 }
 
 // Helm types
@@ -342,4 +382,96 @@ export interface HelmChartMetadata {
   keywords?: string[];
   home?: string;
   sources?: string[];
+}
+
+// Advanced Metrics types
+export interface MetricsSource {
+  name: string;
+  available: boolean;
+  endpoint?: string;
+}
+
+export interface MetricsCapabilities {
+  metrics_server: boolean;
+  prometheus: boolean;
+  sources: MetricsSource[];
+}
+
+export interface NodeMetrics {
+  name: string;
+  cpu_usage: string;
+  cpu_usage_cores: number;
+  memory_usage: string;
+  memory_usage_bytes: number;
+}
+
+export interface PodMetrics {
+  name: string;
+  namespace: string;
+  cpu_usage: string;
+  cpu_usage_cores: number;
+  memory_usage: string;
+  memory_usage_bytes: number;
+}
+
+export interface ClusterMetricsData {
+  total_cpu_capacity: number;
+  total_cpu_allocatable: number;
+  total_cpu_usage: number;
+  cpu_usage_percent: number;
+  total_memory_capacity: number;
+  total_memory_allocatable: number;
+  total_memory_usage: number;
+  memory_usage_percent: number;
+  node_metrics: NodeMetrics[];
+  top_pods_by_cpu: PodMetrics[];
+  top_pods_by_memory: PodMetrics[];
+}
+
+// Settings types
+export interface UserSettings {
+  // Data refresh settings
+  refreshIntervals: {
+    pods: number;
+    deployments: number;
+    services: number;
+    nodes: number;
+    metrics: number;
+    cluster: number;
+  };
+
+  // Metrics settings
+  metrics: {
+    enabled: boolean;
+    autoRefresh: boolean;
+  };
+
+  // Display preferences
+  display: {
+    itemsPerPage: number;
+    compactMode: boolean;
+    showNamespaceColumn: boolean;
+  };
+
+  // Performance settings
+  performance: {
+    enableAutoRefresh: boolean;
+    requestTimeout: number;
+    cacheStaleTime: number;
+    maxRetryAttempts: number;
+  };
+
+  // Advanced settings
+  advanced: {
+    enableAnimations: boolean;
+  };
+}
+
+export interface SettingsState extends UserSettings {
+  updateRefreshInterval: (key: keyof UserSettings['refreshIntervals'], value: number) => void;
+  updateMetricsSetting: (key: keyof UserSettings['metrics'], value: boolean) => void;
+  updateDisplaySetting: (key: keyof UserSettings['display'], value: any) => void;
+  updatePerformanceSetting: (key: keyof UserSettings['performance'], value: any) => void;
+  updateAdvancedSetting: (key: keyof UserSettings['advanced'], value: any) => void;
+  resetToDefaults: () => void;
 }

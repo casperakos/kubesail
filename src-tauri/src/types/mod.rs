@@ -34,6 +34,8 @@ pub struct PodInfo {
     pub node: Option<String>,
     pub ip: Option<String>,
     pub ports: Vec<i32>,
+    pub labels: Option<std::collections::HashMap<String, String>>,
+    pub annotations: Option<std::collections::HashMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,6 +56,7 @@ pub struct ServiceInfo {
     pub cluster_ip: String,
     pub external_ip: Option<String>,
     pub ports: String,
+    pub selector: Option<std::collections::HashMap<String, String>>,
     pub age: String,
 }
 
@@ -81,6 +84,7 @@ pub struct IngressInfo {
     pub addresses: Vec<String>,
     pub age: String,
     pub tls: bool,
+    pub rules: Vec<IngressRule>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,6 +108,23 @@ pub struct IstioVirtualServiceInfo {
     pub hosts: Vec<String>,
     pub gateways: Vec<String>,
     pub age: String,
+    pub routes: Vec<VirtualServiceRoute>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VirtualServiceRoute {
+    pub match_conditions: Vec<RouteMatch>,
+    pub destination_host: String,
+    pub destination_port: Option<u16>,
+    pub weight: Option<u16>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RouteMatch {
+    pub uri_prefix: Option<String>,
+    pub uri_exact: Option<String>,
+    pub uri_regex: Option<String>,
+    pub headers: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

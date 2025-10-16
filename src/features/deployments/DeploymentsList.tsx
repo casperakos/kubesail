@@ -1,5 +1,5 @@
-import { useDeployments, useScaleDeployment, useDeleteDeployment } from "../../hooks/useKube";
-import { useAppStore } from "../../lib/store";
+import { useDeployments, useScaleDeployment, useDeleteDeployment, useNamespacePodMetrics, usePods } from "../../hooks/useKube";
+import { useAppStore, useSettingsStore } from "../../lib/store";
 import {
   Table,
   TableBody,
@@ -18,12 +18,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { PodSelectorModal } from "../../components/PodSelectorModal";
 import { LogsViewer } from "../logs/LogsViewer";
-import { PodInfo } from "../../types";
+import { PodInfo, PodMetrics } from "../../types";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
 
 export function DeploymentsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const showNamespaceColumn = !currentNamespace;
+  const metricsEnabled = useSettingsStore((state) => state.metrics.enabled);
   const { data: deployments, isLoading, error, refetch } = useDeployments(currentNamespace);
   const scaleDeployment = useScaleDeployment();
   const deleteDeployment = useDeleteDeployment();
@@ -44,6 +45,60 @@ export function DeploymentsList() {
   const [selectedPodsForLogs, setSelectedPodsForLogs] = useState<Array<{name: string; namespace: string}> | null>(null);
   const [selectedPodForLogs, setSelectedPodForLogs] = useState<{name: string; namespace: string} | null>(null);
   const [podsForSelection, setPodsForSelection] = useState<PodInfo[] | null>(null);
+
+  // Fetch pod metrics data for current namespace
+  // Convert empty string to undefined for "all namespaces" case
+  const { data: podMetrics, isLoading: podMetricsLoading, error: podMetricsError } = useNamespacePodMetrics(currentNamespace || undefined);
+  const { data: pods } = usePods(currentNamespace);
+
+  // Check if we have metrics available (and array has data) and metrics are enabled in settings
+  const hasAdvancedMetrics = metricsEnabled && !podMetricsLoading && !podMetricsError && podMetrics && podMetrics.length > 0;
+
+  // Helper to get aggregated metrics for a deployment
+  const getDeploymentMetrics = (deploymentName: string, deploymentNamespace: string): { cpu: number; memory: number; podCount: number } | null => {
+    if (!hasAdvancedMetrics || !podMetrics || !pods) return null;
+
+    // Find all pods belonging to this deployment
+    // Pods created by deployments typically have the deployment name as a prefix followed by a hash
+    const deploymentPods = pods.filter(pod =>
+      pod.name.startsWith(`${deploymentName}-`) && pod.namespace === deploymentNamespace
+    );
+
+    if (deploymentPods.length === 0) return null;
+
+    // Aggregate CPU and memory from matching pod metrics
+    let totalCpu = 0;
+    let totalMemory = 0;
+    let metricsCount = 0;
+
+    deploymentPods.forEach(pod => {
+      // Find metrics for this pod
+      const metric = podMetrics.find(
+        m => m.name === pod.name && m.namespace === pod.namespace
+      );
+
+      if (metric) {
+        totalCpu += metric.cpu_usage_cores;
+        totalMemory += metric.memory_usage_bytes;
+        metricsCount++;
+      }
+    });
+
+    return metricsCount > 0 ? { cpu: totalCpu, memory: totalMemory, podCount: deploymentPods.length } : null;
+  };
+
+  const formatBytes = (bytes: number): string => {
+    const gb = bytes / (1024 ** 3);
+    if (gb >= 1) return `${gb.toFixed(1)}GB`;
+    const mb = bytes / (1024 ** 2);
+    if (mb >= 1) return `${mb.toFixed(1)}MB`;
+    return `${(bytes / 1024).toFixed(1)}KB`;
+  };
+
+  const formatCores = (cores: number): string => {
+    if (cores < 1) return `${Math.round(cores * 1000)}m`;
+    return `${cores.toFixed(2)} cores`;
+  };
 
   const restartDeploymentMutation = useMutation({
     mutationFn: ({ namespace, deploymentName }: { namespace: string; deploymentName: string }) =>
@@ -264,6 +319,12 @@ export function DeploymentsList() {
             <TableHead>Ready</TableHead>
             <TableHead>Up-to-date</TableHead>
             <TableHead>Available</TableHead>
+            {hasAdvancedMetrics && (
+              <>
+                <TableHead>CPU</TableHead>
+                <TableHead>Memory</TableHead>
+              </>
+            )}
             <TableHead>Age</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -278,6 +339,8 @@ export function DeploymentsList() {
           ) : (
             filteredDeployments.map((deployment) => {
             const [ready, total] = deployment.ready.split("/").map(Number);
+            const metrics = getDeploymentMetrics(deployment.name, deployment.namespace);
+
             return (
               <TableRow key={deployment.name}>
                 <TableCell className="font-medium">{deployment.name}</TableCell>
@@ -289,6 +352,38 @@ export function DeploymentsList() {
                 </TableCell>
                 <TableCell>{deployment.up_to_date}</TableCell>
                 <TableCell>{deployment.available}</TableCell>
+                {hasAdvancedMetrics && (
+                  <>
+                    <TableCell>
+                      {metrics ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-medium">
+                            {formatCores(metrics.cpu)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {metrics ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-medium">
+                            {formatBytes(metrics.memory)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                  </>
+                )}
                 <TableCell>{deployment.age}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">

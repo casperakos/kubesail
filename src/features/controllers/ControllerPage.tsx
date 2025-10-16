@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeTextFile } from "@tauri-apps/plugin-fs";
 import {
   Table,
   TableBody,
@@ -28,7 +30,12 @@ import {
   ArrowUp,
   ArrowDown,
   Calendar,
-  Filter
+  Filter,
+  Download,
+  Copy,
+  Hash,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import { useAppStore } from "../../lib/store";
 import { useController } from "../../hooks/useControllerDetection";
@@ -62,6 +69,7 @@ interface CustomResource {
 
 interface ControllerPageProps {
   controllerId: string;
+  defaultCRDKind?: string;
 }
 
 // Helper function to extract status information
@@ -357,9 +365,167 @@ function getCronSchedule(resource: CustomResource): string {
   return resource.metadata?.spec?.schedule || "-";
 }
 
+// Helper function to get workflow resource usage
+function getWorkflowResourceUsage(resource: CustomResource): { cpu: string; memory: string } {
+  const resourcesDuration = resource.metadata?.status?.resourcesDuration;
+  if (!resourcesDuration) return { cpu: "-", memory: "-" };
+
+  const cpuSeconds = resourcesDuration.cpu || 0;
+  const memorySeconds = resourcesDuration.memory || 0;
+
+  return {
+    cpu: cpuSeconds > 0 ? `${cpuSeconds}s` : "-",
+    memory: memorySeconds > 0 ? `${memorySeconds}s` : "-"
+  };
+}
+
+// Helper function to get workflow template reference
+function getWorkflowTemplateRef(resource: CustomResource): string {
+  return resource.metadata?.spec?.workflowTemplateRef?.name || "-";
+}
+
+// Helper function to parse base64 workflow parameters
+function parseWorkflowInputParameters(resource: CustomResource): {
+  patient_id?: string;
+  upload_session_id?: string;
+  study_instance_uid?: string;
+  scan_id?: string;
+  series_instance_uid?: string;
+  namespace?: string;
+} | null {
+  try {
+    const params = resource.metadata?.spec?.arguments?.parameters;
+    if (!params || params.length === 0) return null;
+
+    // Find the base64 encoded parameter
+    const base64Param = params.find((p: any) =>
+      p.name?.includes("dicom-extract") || p.name?.includes("base64") || p.name?.includes("msg-bytes")
+    );
+
+    if (base64Param?.value) {
+      // Decode base64
+      const decoded = atob(base64Param.value);
+
+      // Extract fields using regex patterns
+      // Upload session ID: UUID at the start
+      const uploadSessionMatch = decoded.match(/"?\$?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+
+      // Patient ID: format like "54123478_demo" or "demo_54123478"
+      const patientIdMatch = decoded.match(/\n\r?([a-zA-Z0-9_-]+(?:_[a-zA-Z0-9_-]+)?)\x12/);
+
+      // Study Instance UID: format like "568.1567"
+      const studyUidMatch = decoded.match(/\x12\x08([0-9.]+)\x1a/);
+
+      // Scan ID: format like "568.1567_1.567.105"
+      const scanIdMatch = decoded.match(/\x1a\x12([0-9._]+)\x22/);
+
+      // Series Instance UID: format like "1.567.105"
+      const seriesUidMatch = decoded.match(/\x22\t([0-9.]+)\*/);
+
+      // Namespace: last field before end
+      const namespaceMatch = decoded.match(/\*\x04([a-zA-Z0-9-]+)\s*$/);
+
+      return {
+        patient_id: patientIdMatch?.[1],
+        upload_session_id: uploadSessionMatch?.[1],
+        study_instance_uid: studyUidMatch?.[1],
+        scan_id: scanIdMatch?.[1],
+        series_instance_uid: seriesUidMatch?.[1],
+        namespace: namespaceMatch?.[1]
+      };
+    }
+  } catch (e) {
+    console.error("Error parsing workflow input parameters:", e);
+  }
+
+  return null;
+}
+
+// Helper function to extract pipeline execution data from workflow nodes
+function getPipelineExecutionData(resource: CustomResource): Array<{
+  patient_id?: string;
+  pipeline_id?: string;
+  pipeline_run_id?: string;
+  triggering_scan_id?: string;
+  triggering_study_instance_uid?: string;
+  triggering_upload_session_id?: string;
+}> {
+  const results: any[] = [];
+
+  try {
+    // First, try to get data from scan-filter node outputs
+    if (resource.metadata?.status?.nodes) {
+      const nodes = Object.values(resource.metadata.status.nodes) as any[];
+      const scanFilterNode = nodes.find((node: any) =>
+        (node.displayName === "scan-filter" || node.displayName === "scan-filter(0)") &&
+        node.outputs?.parameters
+      );
+
+      if (scanFilterNode) {
+        const selectedPipelinesParam = scanFilterNode.outputs.parameters.find(
+          (p: any) => p.name === "selected-pipelines"
+        );
+
+        if (selectedPipelinesParam?.value) {
+          const pipelines = JSON.parse(selectedPipelinesParam.value);
+          const pipelineArray = Array.isArray(pipelines) ? pipelines : [pipelines];
+          results.push(...pipelineArray);
+        }
+      }
+    }
+
+    // If no pipeline data from scan-filter, fall back to input parameters
+    if (results.length === 0) {
+      const inputData = parseWorkflowInputParameters(resource);
+      if (inputData && (inputData.patient_id || inputData.upload_session_id)) {
+        results.push({
+          patient_id: inputData.patient_id,
+          triggering_scan_id: inputData.scan_id,
+          triggering_study_instance_uid: inputData.study_instance_uid,
+          triggering_upload_session_id: inputData.upload_session_id
+        });
+      }
+    } else {
+      // Enrich pipeline data with patient_id from input parameters
+      const inputData = parseWorkflowInputParameters(resource);
+      if (inputData?.patient_id) {
+        results.forEach(pipeline => {
+          if (!pipeline.patient_id) {
+            pipeline.patient_id = inputData.patient_id;
+          }
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Error parsing pipeline execution data:", e);
+  }
+
+  return results;
+}
+
 // Helper function to check if cron is suspended
 function isCronSuspended(resource: CustomResource): boolean {
   return resource.metadata?.spec?.suspend === true;
+}
+
+// Helper function to extract pipeline names from workflow
+function getWorkflowPipelineNames(resource: CustomResource): string[] {
+  const pipelineData = getPipelineExecutionData(resource);
+  const pipelineNames: string[] = [];
+
+  for (const pipeline of pipelineData) {
+    if (pipeline.pipeline_id) {
+      // Remove "PIPELINE_ID_" prefix and "PIPELINE_" prefix variants
+      const name = pipeline.pipeline_id
+        .replace(/^PIPELINE_ID_/i, '')
+        .replace(/^PIPELINE_/i, '');
+      if (name && !pipelineNames.includes(name)) {
+        pipelineNames.push(name);
+      }
+    }
+  }
+
+  return pipelineNames;
 }
 
 // ============ ARGO EVENTS HELPERS ============
@@ -447,7 +613,7 @@ function getSensorStatus(resource: CustomResource): { status: string; color: str
   return { status: "Unknown", color: "text-gray-600" };
 }
 
-export function ControllerPage({ controllerId }: ControllerPageProps) {
+export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageProps) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const controller = useController(controllerId);
 
@@ -462,6 +628,7 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
   const [resourcesLoading, setResourcesLoading] = useState(false);
   const [resourcesError, setResourcesError] = useState<string | null>(null);
   const [resourceSearchQuery, setResourceSearchQuery] = useState("");
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   // For sorting and filtering
   const [sortOrder, setSortOrder] = useState<"asc" | "desc" | null>("desc"); // Default to newest first
@@ -473,11 +640,30 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
   const [describeResource, setDescribeResource] = useState<CustomResource | null>(null);
   const [yamlResource, setYamlResource] = useState<CustomResource | null>(null);
   const [detailsResource, setDetailsResource] = useState<CustomResource | null>(null);
-  const [workflowViewMode, setWorkflowViewMode] = useState<"details" | "dag">("details");
+  const [workflowViewMode, setWorkflowViewMode] = useState<"details" | "dag" | "all-logs">("details");
 
   // For tracking syncing operations
   const [syncingResources, setSyncingResources] = useState<Set<string>>(new Set());
   const [hardRefreshingResources, setHardRefreshingResources] = useState<Set<string>>(new Set());
+
+  // ESC key handler to close modals
+  useEffect(() => {
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (detailsResource) {
+          setDetailsResource(null);
+          setWorkflowViewMode("details");
+        } else if (describeResource) {
+          setDescribeResource(null);
+        } else if (yamlResource) {
+          setYamlResource(null);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleEscKey);
+    return () => window.removeEventListener("keydown", handleEscKey);
+  }, [detailsResource, describeResource, yamlResource]);
 
   useEffect(() => {
     if (controller) {
@@ -485,17 +671,55 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
     }
   }, [controller]);
 
+  // Auto-select CRD if defaultCRDKind is provided
+  useEffect(() => {
+    if (defaultCRDKind && relatedCRDs.length > 0 && !selectedCRD) {
+      const crd = relatedCRDs.find((c) => c.kind === defaultCRDKind);
+      if (crd) {
+        setSelectedCRD(crd);
+        loadCustomResources(crd);
+      }
+    }
+  }, [defaultCRDKind, relatedCRDs, selectedCRD]);
+
   useEffect(() => {
     let filtered = [...resources];
 
     // Apply search filter
     if (resourceSearchQuery.trim() !== "") {
       const query = resourceSearchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (resource) =>
-          resource.name.toLowerCase().includes(query) ||
-          (resource.namespace && resource.namespace.toLowerCase().includes(query))
-      );
+      filtered = filtered.filter((resource) => {
+        // Search in name and namespace
+        if (resource.name.toLowerCase().includes(query)) return true;
+        if (resource.namespace && resource.namespace.toLowerCase().includes(query)) return true;
+
+        // For workflows, also search in pipeline execution data
+        if (resource.kind === "Workflow") {
+          const pipelineData = getPipelineExecutionData(resource);
+          const pipelineNames = getWorkflowPipelineNames(resource);
+
+          // Search in pipeline names
+          if (pipelineNames.some(name => name.toLowerCase().includes(query))) {
+            return true;
+          }
+
+          // Search in pipeline execution data
+          for (const pipeline of pipelineData) {
+            if (
+              pipeline.patient_id?.toLowerCase().includes(query) ||
+              pipeline.pipeline_id?.toLowerCase().includes(query) ||
+              pipeline.pipeline_run_id?.toLowerCase().includes(query) ||
+              pipeline.triggering_scan_id?.toLowerCase().includes(query) ||
+              pipeline.triggering_study_instance_uid?.toLowerCase().includes(query) ||
+              pipeline.triggering_upload_session_id?.toLowerCase().includes(query)
+            ) {
+              return true;
+            }
+          }
+        }
+
+        return false;
+      });
     }
 
     // Apply date filter
@@ -902,6 +1126,7 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
                     {controllerId === "argo-workflows" && selectedCRD.kind === "Workflow" && (
                       <>
                         <TableHead>Phase</TableHead>
+                        <TableHead>Pipeline</TableHead>
                         <TableHead>Progress</TableHead>
                         <TableHead>Duration</TableHead>
                         <TableHead>Started</TableHead>
@@ -970,6 +1195,7 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
                     const isWorkflowTemplate = resource.kind === "WorkflowTemplate";
                     const isCronWorkflow = resource.kind === "CronWorkflow";
                     const workflowPhase = isWorkflow ? getWorkflowPhase(resource) : null;
+                    const workflowPipelineNames = isWorkflow ? getWorkflowPipelineNames(resource) : [];
                     const workflowProgress = isWorkflow ? getWorkflowProgress(resource) : null;
                     const workflowDuration = isWorkflow ? getWorkflowDuration(resource) : null;
                     const workflowStarted = isWorkflow ? getWorkflowStartTime(resource) : null;
@@ -985,9 +1211,51 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
                     const sensorDepsCount = isSensor ? getSensorDependenciesCount(resource) : null;
                     const sensorTriggersCount = isSensor ? getSensorTriggersCount(resource) : null;
 
+                    const rowId = `${resource.namespace || "cluster"}-${resource.name}`;
+                    const isExpanded = expandedRows.has(rowId);
+                    const pipelineData = isWorkflow ? getPipelineExecutionData(resource) : [];
+                    const hasPipelineData = pipelineData.length > 0;
+
                     return (
-                      <TableRow key={`${resource.namespace || "cluster"}-${resource.name}`}>
-                        <TableCell className="font-mono text-sm">{resource.name}</TableCell>
+                      <>
+                        <TableRow key={rowId}>
+                          <TableCell className="font-mono text-sm">
+                            <div className="flex items-center gap-2">
+                              {isWorkflow && hasPipelineData && (
+                                <button
+                                  onClick={() => {
+                                    const newExpanded = new Set(expandedRows);
+                                    if (isExpanded) {
+                                      newExpanded.delete(rowId);
+                                    } else {
+                                      newExpanded.add(rowId);
+                                    }
+                                    setExpandedRows(newExpanded);
+                                  }}
+                                  className="text-muted-foreground hover:text-foreground"
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="w-4 h-4" />
+                                  ) : (
+                                    <ChevronRight className="w-4 h-4" />
+                                  )}
+                                </button>
+                              )}
+                              {resource.kind === "Workflow" ? (
+                                <button
+                                  onClick={() => {
+                                    setWorkflowViewMode("dag");
+                                    setDetailsResource(resource);
+                                  }}
+                                  className="text-primary hover:underline cursor-pointer text-left"
+                                >
+                                  {resource.name}
+                                </button>
+                              ) : (
+                                resource.name
+                              )}
+                            </div>
+                          </TableCell>
                         {selectedCRD.scope === "Namespaced" && (
                           <TableCell>{resource.namespace || "-"}</TableCell>
                         )}
@@ -1115,6 +1383,19 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
                               </Badge>
                             </TableCell>
                             <TableCell>
+                              {workflowPipelineNames.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {workflowPipelineNames.map((name, idx) => (
+                                    <Badge key={idx} variant="outline" className="text-xs">
+                                      {name}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
                               <span className="text-xs font-mono">{workflowProgress}</span>
                             </TableCell>
                             <TableCell>
@@ -1171,7 +1452,13 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
                           <div className="flex items-center justify-end gap-1">
                             {(controllerId === "argocd" || controllerId === "argo-workflows" || controllerId === "argo-events") && (
                               <Button
-                                onClick={() => setDetailsResource(resource)}
+                                onClick={() => {
+                                  // For Workflows, open DAG view directly
+                                  if (resource.kind === "Workflow") {
+                                    setWorkflowViewMode("dag");
+                                  }
+                                  setDetailsResource(resource);
+                                }}
                                 variant="ghost"
                                 size="sm"
                                 title="View Details"
@@ -1242,6 +1529,58 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
                           </div>
                         </TableCell>
                       </TableRow>
+
+                      {/* Expanded Row for Pipeline Execution Details */}
+                      {isExpanded && hasPipelineData && (
+                        <TableRow key={`${rowId}-expanded`} className="bg-muted/30">
+                          <TableCell colSpan={selectedCRD.scope === "Namespaced" ? 10 : 9} className="p-4">
+                            <div className="space-y-3">
+                              <h4 className="text-sm font-semibold text-foreground">Pipeline Execution Details</h4>
+                              {pipelineData.map((pipeline, idx) => (
+                                <div key={idx} className="grid grid-cols-2 gap-3 p-3 bg-background rounded-lg border border-border">
+                                  {pipeline.patient_id && (
+                                    <div>
+                                      <p className="text-xs text-muted-foreground mb-1">Patient ID</p>
+                                      <p className="text-sm font-mono font-semibold">{pipeline.patient_id}</p>
+                                    </div>
+                                  )}
+                                  {pipeline.pipeline_id && (
+                                    <div>
+                                      <p className="text-xs text-muted-foreground mb-1">Pipeline ID</p>
+                                      <p className="text-sm font-mono">{pipeline.pipeline_id}</p>
+                                    </div>
+                                  )}
+                                  {pipeline.pipeline_run_id && (
+                                    <div className="col-span-2">
+                                      <p className="text-xs text-muted-foreground mb-1">Pipeline Run ID</p>
+                                      <p className="text-sm font-mono text-xs break-all">{pipeline.pipeline_run_id}</p>
+                                    </div>
+                                  )}
+                                  {pipeline.triggering_scan_id && (
+                                    <div>
+                                      <p className="text-xs text-muted-foreground mb-1">Scan ID</p>
+                                      <p className="text-sm font-mono">{pipeline.triggering_scan_id}</p>
+                                    </div>
+                                  )}
+                                  {pipeline.triggering_study_instance_uid && (
+                                    <div>
+                                      <p className="text-xs text-muted-foreground mb-1">Study Instance UID</p>
+                                      <p className="text-sm font-mono">{pipeline.triggering_study_instance_uid}</p>
+                                    </div>
+                                  )}
+                                  {pipeline.triggering_upload_session_id && (
+                                    <div className="col-span-2">
+                                      <p className="text-xs text-muted-foreground mb-1">Upload Session ID</p>
+                                      <p className="text-sm font-mono text-xs break-all">{pipeline.triggering_upload_session_id}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
                     );
                   })}
                 </TableBody>
@@ -1469,7 +1808,7 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
         {/* Details Modal for Workflows */}
         {detailsResource && controllerId === "argo-workflows" && detailsResource.kind === "Workflow" && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-background rounded-xl border border-border shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="bg-background rounded-xl border border-border shadow-2xl max-w-[95vw] w-full max-h-[95vh] overflow-hidden flex flex-col">
               {/* Header with tabs */}
               <div className="border-b border-border">
                 <div className="flex items-center justify-between px-6 pt-4">
@@ -1510,6 +1849,16 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
                     }`}
                   >
                     Workflow DAG
+                  </button>
+                  <button
+                    onClick={() => setWorkflowViewMode("all-logs")}
+                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                      workflowViewMode === "all-logs"
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    All Logs
                   </button>
                 </div>
               </div>
@@ -1552,11 +1901,40 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
                   </div>
                 </div>
 
+                {/* Resource Usage */}
+                {(() => {
+                  const resources = getWorkflowResourceUsage(detailsResource);
+                  if (resources.cpu !== "-" || resources.memory !== "-") {
+                    return (
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Resource Usage</h4>
+                        <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">CPU Duration</p>
+                            <p className="text-sm font-mono">{resources.cpu}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Memory Duration</p>
+                            <p className="text-sm font-mono">{resources.memory}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
                 {/* Workflow Spec */}
                 {detailsResource.metadata?.spec && (
                   <div className="space-y-3">
                     <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Specification</h4>
                     <div className="p-4 bg-muted/30 rounded-lg space-y-2">
+                      {getWorkflowTemplateRef(detailsResource) !== "-" && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Workflow Template:</span>
+                          <Badge variant="secondary" className="font-mono">{getWorkflowTemplateRef(detailsResource)}</Badge>
+                        </div>
+                      )}
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Entrypoint:</span>
                         <span className="text-sm font-mono">{detailsResource.metadata.spec.entrypoint || "-"}</span>
@@ -1565,6 +1943,33 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">Service Account:</span>
                           <span className="text-sm font-mono">{detailsResource.metadata.spec.serviceAccountName}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Workflow Labels */}
+                {detailsResource.metadata?.labels && Object.keys(detailsResource.metadata.labels).length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Labels & Triggers</h4>
+                    <div className="p-4 bg-muted/30 rounded-lg space-y-2">
+                      {detailsResource.metadata.labels['events.argoproj.io/sensor'] && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Event Sensor:</span>
+                          <Badge variant="outline" className="font-mono">{detailsResource.metadata.labels['events.argoproj.io/sensor']}</Badge>
+                        </div>
+                      )}
+                      {detailsResource.metadata.labels['events.argoproj.io/trigger'] && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Trigger:</span>
+                          <Badge variant="outline" className="font-mono">{detailsResource.metadata.labels['events.argoproj.io/trigger']}</Badge>
+                        </div>
+                      )}
+                      {detailsResource.metadata.labels['workflows.argoproj.io/creator'] && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Created By:</span>
+                          <span className="text-xs font-mono">{detailsResource.metadata.labels['workflows.argoproj.io/creator']}</span>
                         </div>
                       )}
                     </div>
@@ -1598,27 +2003,43 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
                     </h4>
                     <div className="space-y-2 max-h-60 overflow-y-auto">
                       {Object.entries(detailsResource.metadata.status.nodes).map(([nodeId, node]: [string, any]) => (
-                        <div key={nodeId} className="p-3 bg-muted/30 rounded-lg">
-                          <div className="flex items-center justify-between mb-1">
+                        <div key={nodeId} className="p-3 bg-muted/30 rounded-lg space-y-1">
+                          <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">{node.displayName || node.name}</span>
-                            <Badge
-                              variant="outline"
-                              className={
-                                node.phase === "Succeeded"
-                                  ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs"
-                                  : node.phase === "Failed" || node.phase === "Error"
-                                  ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs"
-                                  : node.phase === "Running"
-                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs"
-                                  : "text-xs"
-                              }
-                            >
-                              {node.phase}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs">{node.type}</Badge>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  node.phase === "Succeeded"
+                                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs"
+                                    : node.phase === "Failed" || node.phase === "Error"
+                                    ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs"
+                                    : node.phase === "Running"
+                                    ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs"
+                                    : "text-xs"
+                                }
+                              >
+                                {node.phase}
+                              </Badge>
+                            </div>
                           </div>
-                          <p className="text-xs text-muted-foreground">Type: {node.type}</p>
+                          {node.outputs?.exitCode && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">Exit Code:</span>
+                              <Badge variant={node.outputs.exitCode === "0" ? "secondary" : "destructive"} className="text-xs">
+                                {node.outputs.exitCode}
+                              </Badge>
+                            </div>
+                          )}
                           {node.message && (
-                            <p className="text-xs text-muted-foreground mt-1">{node.message}</p>
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">{node.message}</p>
+                          )}
+                          {node.resourcesDuration && (node.resourcesDuration.cpu > 0 || node.resourcesDuration.memory > 0) && (
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                              {node.resourcesDuration.cpu > 0 && <span>CPU: {node.resourcesDuration.cpu}s</span>}
+                              {node.resourcesDuration.memory > 0 && <span>Memory: {node.resourcesDuration.memory}s</span>}
+                            </div>
                           )}
                         </div>
                       ))}
@@ -1627,11 +2048,12 @@ export function ControllerPage({ controllerId }: ControllerPageProps) {
                 )}
                 </div>
               ) : (
-                <div className="flex-1 overflow-hidden" style={{ height: '600px', width: '100%' }}>
+                <div className="flex-1 overflow-hidden" style={{ height: '75vh', width: '100%' }}>
                   <WorkflowDAGViewer
                     nodes={detailsResource.metadata?.status?.nodes || {}}
                     namespace={detailsResource.namespace}
                     workflowName={detailsResource.name}
+                    viewMode={workflowViewMode === "dag" ? "dag" : "all-logs"}
                   />
                 </div>
               )}

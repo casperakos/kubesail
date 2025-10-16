@@ -58,16 +58,18 @@ export function NamespaceSelector() {
     <>
       <button
         onClick={() => setShowModal(true)}
-        className="group flex items-center gap-2 px-4 py-2 rounded-xl bg-background/50 border border-border/50 hover:border-primary/50 hover:shadow-md transition-all duration-200"
+        className="group flex items-center gap-3 px-5 py-2.5 rounded-xl bg-card border-2 border-primary/20 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10 transition-all duration-200"
       >
-        <Layers className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+        <div className="p-1.5 rounded-lg bg-primary/10">
+          <Layers className="w-4 h-4 text-primary" />
+        </div>
         <div className="flex flex-col items-start">
-          <span className="text-[10px] text-muted-foreground font-medium">NAMESPACE</span>
-          <span className="text-sm font-semibold text-foreground">
+          <span className="text-[10px] text-primary/70 font-bold uppercase tracking-wider">Namespace</span>
+          <span className="text-sm font-bold text-foreground">
             {currentNamespace || "All Namespaces"}
           </span>
         </div>
-        <ChevronDown className="w-4 h-4 text-muted-foreground ml-2" />
+        <ChevronDown className="w-4 h-4 text-muted-foreground ml-1" />
       </button>
 
       {showModal && (

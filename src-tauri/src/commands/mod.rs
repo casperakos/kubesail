@@ -1173,3 +1173,42 @@ pub async fn helm_upgrade_release(
         .await
         .map_err(|e| e.to_string())
 }
+
+// ==================== Metrics Commands ====================
+
+#[tauri::command]
+pub async fn detect_metrics_capabilities(
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<crate::metrics::MetricsCapabilities, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::metrics::detect_metrics_capabilities(client)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_cluster_metrics_data(
+    client_manager: State<'_, KubeClientManager>,
+) -> Result<crate::metrics::ClusterMetricsData, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::metrics::get_cluster_metrics(client)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_namespace_pod_metrics(
+    namespace: Option<String>,
+) -> Result<Vec<crate::metrics::PodMetrics>, String> {
+    crate::metrics::get_pod_metrics(namespace.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}

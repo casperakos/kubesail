@@ -1,54 +1,75 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/api";
+import { useSettingsStore } from "../lib/store";
 
 export function useContexts() {
+  const refreshInterval = useSettingsStore((state) => state.refreshIntervals.cluster);
+  const autoRefreshEnabled = useSettingsStore((state) => state.performance.enableAutoRefresh);
+
   return useQuery({
     queryKey: ["contexts"],
     queryFn: () => api.getContexts(),
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: autoRefreshEnabled ? refreshInterval : false,
   });
 }
 
 export function useClusters() {
+  const refreshInterval = useSettingsStore((state) => state.refreshIntervals.cluster);
+  const autoRefreshEnabled = useSettingsStore((state) => state.performance.enableAutoRefresh);
+
   return useQuery({
     queryKey: ["clusters"],
     queryFn: () => api.getClusters(),
-    refetchInterval: 30000,
+    refetchInterval: autoRefreshEnabled ? refreshInterval : false,
   });
 }
 
 export function useNamespaces() {
+  const refreshInterval = useSettingsStore((state) => state.refreshIntervals.cluster);
+  const autoRefreshEnabled = useSettingsStore((state) => state.performance.enableAutoRefresh);
+
   return useQuery({
     queryKey: ["namespaces"],
     queryFn: () => api.getNamespaces(),
-    refetchInterval: 10000, // Refetch every 10 seconds
+    refetchInterval: autoRefreshEnabled ? refreshInterval : 5000, // Always check health every 5s minimum
+    retry: 1, // Only retry once to detect disconnection faster
+    retryDelay: 1000, // Quick retry for connection check
   });
 }
 
 export function usePods(namespace: string) {
+  const refreshInterval = useSettingsStore((state) => state.refreshIntervals.pods);
+  const autoRefreshEnabled = useSettingsStore((state) => state.performance.enableAutoRefresh);
+
   return useQuery({
     queryKey: ["pods", namespace],
     queryFn: () => api.getPods(namespace),
     enabled: namespace !== undefined,
-    refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    refetchInterval: autoRefreshEnabled ? refreshInterval : false,
   });
 }
 
 export function useDeployments(namespace: string) {
+  const refreshInterval = useSettingsStore((state) => state.refreshIntervals.deployments);
+  const autoRefreshEnabled = useSettingsStore((state) => state.performance.enableAutoRefresh);
+
   return useQuery({
     queryKey: ["deployments", namespace],
     queryFn: () => api.getDeployments(namespace),
     enabled: namespace !== undefined,
-    refetchInterval: 5000,
+    refetchInterval: autoRefreshEnabled ? refreshInterval : false,
   });
 }
 
 export function useServices(namespace: string) {
+  const refreshInterval = useSettingsStore((state) => state.refreshIntervals.services);
+  const autoRefreshEnabled = useSettingsStore((state) => state.performance.enableAutoRefresh);
+
   return useQuery({
     queryKey: ["services", namespace],
     queryFn: () => api.getServices(namespace),
     enabled: namespace !== undefined,
-    refetchInterval: 10000,
+    refetchInterval: autoRefreshEnabled ? refreshInterval : false,
   });
 }
 
@@ -86,6 +107,14 @@ export function usePodLogs(
     queryFn: () => api.getPodLogs(namespace, podName, container, tailLines),
     enabled: namespace !== undefined && !!podName,
     refetchInterval: 2000, // Refetch logs every 2 seconds
+  });
+}
+
+export function usePodContainers(namespace: string, podName: string) {
+  return useQuery({
+    queryKey: ["podContainers", namespace, podName],
+    queryFn: () => api.getPodContainers(namespace, podName),
+    enabled: namespace !== undefined && !!podName,
   });
 }
 
@@ -256,11 +285,14 @@ export function useDeleteSecret() {
 }
 
 export function useStatefulSets(namespace: string) {
+  const refreshInterval = useSettingsStore((state) => state.refreshIntervals.deployments);
+  const autoRefreshEnabled = useSettingsStore((state) => state.performance.enableAutoRefresh);
+
   return useQuery({
     queryKey: ["statefulsets", namespace],
     queryFn: () => api.getStatefulSets(namespace),
     enabled: namespace !== undefined,
-    refetchInterval: 5000,
+    refetchInterval: autoRefreshEnabled ? refreshInterval : false,
   });
 }
 
@@ -335,11 +367,14 @@ export function useDeleteStatefulSet() {
 }
 
 export function useDaemonSets(namespace: string) {
+  const refreshInterval = useSettingsStore((state) => state.refreshIntervals.deployments);
+  const autoRefreshEnabled = useSettingsStore((state) => state.performance.enableAutoRefresh);
+
   return useQuery({
     queryKey: ["daemonsets", namespace],
     queryFn: () => api.getDaemonSets(namespace),
     enabled: namespace !== undefined,
-    refetchInterval: 5000,
+    refetchInterval: autoRefreshEnabled ? refreshInterval : false,
   });
 }
 
@@ -522,10 +557,13 @@ export function useDeleteCronJob() {
 }
 
 export function useNodes() {
+  const refreshInterval = useSettingsStore((state) => state.refreshIntervals.nodes);
+  const autoRefreshEnabled = useSettingsStore((state) => state.performance.enableAutoRefresh);
+
   return useQuery({
     queryKey: ["nodes"],
     queryFn: () => api.getNodes(),
-    refetchInterval: 10000,
+    refetchInterval: autoRefreshEnabled ? refreshInterval : false,
   });
 }
 
@@ -596,5 +634,66 @@ export function useServiceAccounts(namespace: string) {
     queryFn: () => api.getServiceAccounts(namespace),
     enabled: namespace !== undefined,
     refetchInterval: 10000,
+  });
+}
+
+// Metrics Hooks
+export function useMetricsCapabilities() {
+  const refreshInterval = useSettingsStore((state) => state.refreshIntervals.cluster);
+  const autoRefreshEnabled = useSettingsStore((state) => state.performance.enableAutoRefresh);
+  const metricsEnabled = useSettingsStore((state) => state.metrics.enabled);
+
+  return useQuery({
+    queryKey: ["metrics-capabilities"],
+    queryFn: () => api.detectMetricsCapabilities(),
+    refetchInterval: autoRefreshEnabled && metricsEnabled ? refreshInterval : false,
+    staleTime: 30000, // Consider data stale after 30 seconds
+    enabled: metricsEnabled,
+  });
+}
+
+export function useClusterMetricsData() {
+  const refreshInterval = useSettingsStore((state) => state.refreshIntervals.metrics);
+  const autoRefreshEnabled = useSettingsStore((state) => state.performance.enableAutoRefresh);
+  const metricsEnabled = useSettingsStore((state) => state.metrics.enabled);
+  const metricsAutoRefresh = useSettingsStore((state) => state.metrics.autoRefresh);
+  const staleTime = useSettingsStore((state) => state.performance.cacheStaleTime);
+  const retry = useSettingsStore((state) => state.performance.maxRetryAttempts);
+
+  return useQuery({
+    queryKey: ["cluster-metrics-data"],
+    queryFn: () => api.getClusterMetricsData(),
+    refetchInterval: autoRefreshEnabled && metricsEnabled && metricsAutoRefresh ? refreshInterval : false,
+    staleTime,
+    retry,
+    enabled: metricsEnabled,
+  });
+}
+
+export function useNamespacePodMetrics(namespace?: string) {
+  const refreshInterval = useSettingsStore((state) => state.refreshIntervals.metrics);
+  const autoRefreshEnabled = useSettingsStore((state) => state.performance.enableAutoRefresh);
+  const metricsEnabled = useSettingsStore((state) => state.metrics.enabled);
+  const metricsAutoRefresh = useSettingsStore((state) => state.metrics.autoRefresh);
+  const staleTime = useSettingsStore((state) => state.performance.cacheStaleTime);
+  const retry = useSettingsStore((state) => state.performance.maxRetryAttempts);
+
+  return useQuery({
+    queryKey: ["namespace-pod-metrics", namespace],
+    queryFn: () => api.getNamespacePodMetrics(namespace),
+    refetchInterval: autoRefreshEnabled && metricsEnabled && metricsAutoRefresh ? refreshInterval : false,
+    staleTime,
+    retry,
+    enabled: metricsEnabled,
+    // Always enabled when metrics enabled - undefined/empty namespace means all namespaces
+  });
+}
+
+// Port Forwards Hook
+export function usePortForwards() {
+  return useQuery({
+    queryKey: ["port-forwards"],
+    queryFn: () => api.listPortForwards(),
+    refetchInterval: 3000, // Check every 3 seconds
   });
 }

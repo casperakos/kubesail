@@ -1,6 +1,7 @@
 mod commands;
 mod helm;
 mod kube;
+mod metrics;
 mod portforward;
 mod shell;
 mod types;
@@ -9,10 +10,60 @@ use kube::KubeClientManager;
 use portforward::PortForwardManager;
 use shell::ShellManager;
 
+/// Set up PATH environment variable to include common locations for kubectl and its plugins
+fn setup_path_env() {
+    use std::env;
+
+    let current_path = env::var("PATH").unwrap_or_default();
+    let mut paths: Vec<String> = vec![];
+
+    // Add current PATH
+    if !current_path.is_empty() {
+        paths.push(current_path);
+    }
+
+    // Add common locations for kubectl plugins and binaries
+    if let Ok(home) = env::var("HOME") {
+        // Homebrew locations (macOS)
+        paths.push("/opt/homebrew/bin".to_string());
+        paths.push("/usr/local/bin".to_string());
+
+        // User's local bin
+        paths.push(format!("{}/.local/bin", home));
+        paths.push(format!("{}/bin", home));
+
+        // Krew (kubectl plugin manager)
+        paths.push(format!("{}/.krew/bin", home));
+    }
+
+    // System paths
+    paths.push("/usr/bin".to_string());
+    paths.push("/bin".to_string());
+    paths.push("/usr/sbin".to_string());
+    paths.push("/sbin".to_string());
+
+    // Windows paths
+    if cfg!(target_os = "windows") {
+        if let Ok(programfiles) = env::var("ProgramFiles") {
+            paths.push(format!("{}\\kubectl", programfiles));
+        }
+    }
+
+    // Join all paths with the appropriate separator
+    let separator = if cfg!(target_os = "windows") { ";" } else { ":" };
+    let new_path = paths.join(separator);
+
+    env::set_var("PATH", &new_path);
+    tracing::info!("Set PATH to: {}", new_path);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Initialize logging
     tracing_subscriber::fmt::init();
+
+    // Set up PATH to include common locations for kubectl and its plugins
+    setup_path_env();
 
     let client_manager = KubeClientManager::new();
     let portforward_manager = PortForwardManager::new();
@@ -20,6 +71,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .manage(client_manager)
@@ -103,6 +155,9 @@ pub fn run() {
             commands::helm_rollback_release,
             commands::helm_get_history,
             commands::helm_upgrade_release,
+            commands::detect_metrics_capabilities,
+            commands::get_cluster_metrics_data,
+            commands::get_namespace_pod_metrics,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -13,8 +13,10 @@ import {
   useSuspendCronJob,
   useResumeCronJob,
   useDeleteCronJob,
+  useNamespacePodMetrics,
+  usePods,
 } from "../../hooks/useKube";
-import { useAppStore } from "../../lib/store";
+import { useAppStore, useSettingsStore } from "../../lib/store";
 import {
   Table,
   TableBody,
@@ -37,9 +39,13 @@ import { LoadingSpinner } from "../../components/LoadingSpinner";
 
 type WorkloadType = "statefulsets" | "daemonsets" | "jobs" | "cronjobs";
 
-export function WorkloadsList() {
+interface WorkloadsListProps {
+  defaultTab?: WorkloadType;
+}
+
+export function WorkloadsList({ defaultTab = "statefulsets" }: WorkloadsListProps) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
-  const [activeTab, setActiveTab] = useState<WorkloadType>("statefulsets");
+  const [activeTab, setActiveTab] = useState<WorkloadType>(defaultTab);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedResource, setSelectedResource] = useState<{name: string; namespace: string} | null>(null);
 
@@ -239,6 +245,7 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
   const deployments = data;
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const showNamespaceColumn = !currentNamespace;
+  const metricsEnabled = useSettingsStore((state) => state.metrics.enabled);
   const scaleStatefulSet = useScaleStatefulSet();
   const deleteStatefulSet = useDeleteStatefulSet();
   const queryClient = useQueryClient();
@@ -256,6 +263,58 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
   const [selectedPodForLogs, setSelectedPodForLogs] = useState<{name: string; namespace: string} | null>(null);
   const [podsForSelection, setPodsForSelection] = useState<PodInfo[] | null>(null);
   const [selectedStatefulSetForDescribe, setSelectedStatefulSetForDescribe] = useState<{name: string; namespace: string} | null>(null);
+
+  // Fetch pod metrics data for current namespace
+  const { data: podMetrics, isLoading: podMetricsLoading, error: podMetricsError } = useNamespacePodMetrics(currentNamespace || undefined);
+  const { data: pods } = usePods(currentNamespace);
+
+  // Check if we have metrics available (and array has data) and metrics are enabled in settings
+  const hasAdvancedMetrics = metricsEnabled && !podMetricsLoading && !podMetricsError && podMetrics && podMetrics.length > 0;
+
+  // Helper to get aggregated metrics for a statefulset
+  const getStatefulSetMetrics = (statefulsetName: string, statefulsetNamespace: string): { cpu: number; memory: number; podCount: number } | null => {
+    if (!hasAdvancedMetrics || !podMetrics || !pods) return null;
+
+    // Find all pods belonging to this statefulset
+    // Pods created by statefulsets have the statefulset name as a prefix followed by an index number
+    const statefulsetPods = pods.filter(pod =>
+      pod.name.startsWith(`${statefulsetName}-`) && pod.namespace === statefulsetNamespace
+    );
+
+    if (statefulsetPods.length === 0) return null;
+
+    // Aggregate CPU and memory from matching pod metrics
+    let totalCpu = 0;
+    let totalMemory = 0;
+    let metricsCount = 0;
+
+    statefulsetPods.forEach(pod => {
+      const metric = podMetrics.find(
+        m => m.name === pod.name && m.namespace === pod.namespace
+      );
+
+      if (metric) {
+        totalCpu += metric.cpu_usage_cores;
+        totalMemory += metric.memory_usage_bytes;
+        metricsCount++;
+      }
+    });
+
+    return metricsCount > 0 ? { cpu: totalCpu, memory: totalMemory, podCount: statefulsetPods.length } : null;
+  };
+
+  const formatBytes = (bytes: number): string => {
+    const gb = bytes / (1024 ** 3);
+    if (gb >= 1) return `${gb.toFixed(1)}GB`;
+    const mb = bytes / (1024 ** 2);
+    if (mb >= 1) return `${mb.toFixed(1)}MB`;
+    return `${(bytes / 1024).toFixed(1)}KB`;
+  };
+
+  const formatCores = (cores: number): string => {
+    if (cores < 1) return `${Math.round(cores * 1000)}m`;
+    return `${cores.toFixed(2)} cores`;
+  };
 
   const restartStatefulSetMutation = useMutation({
     mutationFn: ({ namespace, statefulsetName }: { namespace: string; statefulsetName: string }) =>
@@ -394,6 +453,12 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
             {showNamespaceColumn && <TableHead>Namespace</TableHead>}
             <TableHead>Ready</TableHead>
             <TableHead>Replicas</TableHead>
+            {hasAdvancedMetrics && (
+              <>
+                <TableHead>CPU</TableHead>
+                <TableHead>Memory</TableHead>
+              </>
+            )}
             <TableHead>Age</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -408,7 +473,9 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
               </TableCell>
             </TableRow>
           ) : (
-            data.map((sts: any) => (
+            data.map((sts: any) => {
+            const metrics = getStatefulSetMetrics(sts.name, sts.namespace);
+            return (
             <TableRow key={sts.name}>
               <TableCell className="font-medium">{sts.name}</TableCell>
               {showNamespaceColumn && <TableCell>{sts.namespace}</TableCell>}
@@ -424,6 +491,38 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
                 </Badge>
               </TableCell>
               <TableCell>{sts.replicas}</TableCell>
+              {hasAdvancedMetrics && (
+                <>
+                  <TableCell>
+                    {metrics ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium">
+                          {formatCores(metrics.cpu)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {metrics ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium">
+                          {formatBytes(metrics.memory)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                </>
+              )}
               <TableCell>{sts.age}</TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
@@ -485,7 +584,8 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
                 </div>
               </TableCell>
             </TableRow>
-            ))
+            );
+            })
           )}
         </TableBody>
       </Table>
@@ -623,6 +723,7 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
   const daemonsets = data;
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const showNamespaceColumn = !currentNamespace;
+  const metricsEnabled = useSettingsStore((state) => state.metrics.enabled);
   const deleteDaemonSet = useDeleteDaemonSet();
   const queryClient = useQueryClient();
   const [restartingDaemonSet, setRestartingDaemonSet] = useState<string | null>(null);
@@ -633,6 +734,58 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
   const [selectedPodForLogsDS, setSelectedPodForLogsDS] = useState<{name: string; namespace: string} | null>(null);
   const [podsForSelectionDS, setPodsForSelectionDS] = useState<PodInfo[] | null>(null);
   const [selectedDaemonSetForDescribe, setSelectedDaemonSetForDescribe] = useState<{name: string; namespace: string} | null>(null);
+
+  // Fetch pod metrics data for current namespace
+  const { data: podMetrics, isLoading: podMetricsLoading, error: podMetricsError } = useNamespacePodMetrics(currentNamespace || undefined);
+  const { data: pods } = usePods(currentNamespace);
+
+  // Check if we have metrics available (and array has data) and metrics are enabled in settings
+  const hasAdvancedMetrics = metricsEnabled && !podMetricsLoading && !podMetricsError && podMetrics && podMetrics.length > 0;
+
+  // Helper to get aggregated metrics for a daemonset
+  const getDaemonSetMetrics = (daemonsetName: string, daemonsetNamespace: string): { cpu: number; memory: number; podCount: number } | null => {
+    if (!hasAdvancedMetrics || !podMetrics || !pods) return null;
+
+    // Find all pods belonging to this daemonset
+    // Pods created by daemonsets have the daemonset name as a prefix followed by a hash
+    const daemonsetPods = pods.filter(pod =>
+      pod.name.startsWith(`${daemonsetName}-`) && pod.namespace === daemonsetNamespace
+    );
+
+    if (daemonsetPods.length === 0) return null;
+
+    // Aggregate CPU and memory from matching pod metrics
+    let totalCpu = 0;
+    let totalMemory = 0;
+    let metricsCount = 0;
+
+    daemonsetPods.forEach(pod => {
+      const metric = podMetrics.find(
+        m => m.name === pod.name && m.namespace === pod.namespace
+      );
+
+      if (metric) {
+        totalCpu += metric.cpu_usage_cores;
+        totalMemory += metric.memory_usage_bytes;
+        metricsCount++;
+      }
+    });
+
+    return metricsCount > 0 ? { cpu: totalCpu, memory: totalMemory, podCount: daemonsetPods.length } : null;
+  };
+
+  const formatBytes = (bytes: number): string => {
+    const gb = bytes / (1024 ** 3);
+    if (gb >= 1) return `${gb.toFixed(1)}GB`;
+    const mb = bytes / (1024 ** 2);
+    if (mb >= 1) return `${mb.toFixed(1)}MB`;
+    return `${(bytes / 1024).toFixed(1)}KB`;
+  };
+
+  const formatCores = (cores: number): string => {
+    if (cores < 1) return `${Math.round(cores * 1000)}m`;
+    return `${cores.toFixed(2)} cores`;
+  };
 
   const restartDaemonSetMutation = useMutation({
     mutationFn: ({ namespace, daemonsetName }: { namespace: string; daemonsetName: string }) =>
@@ -740,6 +893,12 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
             <TableHead>Ready</TableHead>
             <TableHead>Up-to-date</TableHead>
             <TableHead>Available</TableHead>
+            {hasAdvancedMetrics && (
+              <>
+                <TableHead>CPU</TableHead>
+                <TableHead>Memory</TableHead>
+              </>
+            )}
             <TableHead>Age</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -754,7 +913,9 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
               </TableCell>
             </TableRow>
           ) : (
-            data.map((ds: any) => (
+            data.map((ds: any) => {
+            const metrics = getDaemonSetMetrics(ds.name, ds.namespace);
+            return (
             <TableRow key={ds.name}>
               <TableCell className="font-medium">{ds.name}</TableCell>
               {showNamespaceColumn && <TableCell>{ds.namespace}</TableCell>}
@@ -767,6 +928,38 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
               </TableCell>
               <TableCell>{ds.up_to_date}</TableCell>
               <TableCell>{ds.available}</TableCell>
+              {hasAdvancedMetrics && (
+                <>
+                  <TableCell>
+                    {metrics ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium">
+                          {formatCores(metrics.cpu)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {metrics ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium">
+                          {formatBytes(metrics.memory)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {metrics.podCount} {metrics.podCount === 1 ? 'pod' : 'pods'}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                </>
+              )}
               <TableCell>{ds.age}</TableCell>
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2">
@@ -820,7 +1013,8 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
                 </div>
               </TableCell>
             </TableRow>
-            ))
+            );
+            })
           )}
         </TableBody>
       </Table>

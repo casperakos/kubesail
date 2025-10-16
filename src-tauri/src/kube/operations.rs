@@ -116,6 +116,16 @@ pub async fn list_pods(client: Client, namespace: &str) -> Result<Vec<PodInfo>> 
             })
             .unwrap_or_default();
 
+        // Extract labels from pod metadata (convert BTreeMap to HashMap)
+        let labels = pod.metadata.labels.as_ref().map(|l| {
+            l.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+        });
+
+        // Extract annotations from pod metadata (convert BTreeMap to HashMap)
+        let annotations = pod.metadata.annotations.as_ref().map(|a| {
+            a.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+        });
+
         result.push(PodInfo {
             name,
             namespace,
@@ -126,6 +136,8 @@ pub async fn list_pods(client: Client, namespace: &str) -> Result<Vec<PodInfo>> 
             node,
             ip,
             ports,
+            labels,
+            annotations,
         });
     }
 
@@ -220,6 +232,12 @@ pub async fn list_services(client: Client, namespace: &str) -> Result<Vec<Servic
             })
             .unwrap_or_else(|| "None".to_string());
 
+        let selector = spec
+            .and_then(|s| s.selector.as_ref())
+            .map(|sel| {
+                sel.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+            });
+
         let age = service
             .metadata
             .creation_timestamp
@@ -234,6 +252,7 @@ pub async fn list_services(client: Client, namespace: &str) -> Result<Vec<Servic
             cluster_ip,
             external_ip,
             ports,
+            selector,
             age,
         });
     }
@@ -627,13 +646,54 @@ pub async fn list_ingresses(client: Client, namespace: &str) -> Result<Vec<Ingre
 
         let mut hosts = Vec::new();
         let mut has_tls = false;
+        let mut rules_info = Vec::new();
 
         if let Some(spec) = ingress.spec.as_ref() {
             if let Some(rules) = &spec.rules {
                 for rule in rules {
-                    if let Some(host) = &rule.host {
+                    let host = rule.host.clone().unwrap_or_else(|| "*".to_string());
+
+                    if rule.host.is_some() {
                         hosts.push(host.clone());
                     }
+
+                    let mut paths_info = Vec::new();
+                    if let Some(http) = &rule.http {
+                        for path_rule in &http.paths {
+                            let path = path_rule.path.clone().unwrap_or_else(|| "/".to_string());
+                            let path_type = path_rule.path_type.clone();
+
+                            let (service, port) = if let Some(backend) = &path_rule.backend.service {
+                                let svc_name = backend.name.clone();
+                                let svc_port = if let Some(port) = &backend.port {
+                                    if let Some(num) = port.number {
+                                        num.to_string()
+                                    } else if let Some(name) = &port.name {
+                                        name.clone()
+                                    } else {
+                                        "unknown".to_string()
+                                    }
+                                } else {
+                                    "unknown".to_string()
+                                };
+                                (svc_name, svc_port)
+                            } else {
+                                ("unknown".to_string(), "unknown".to_string())
+                            };
+
+                            paths_info.push(crate::types::IngressPath {
+                                path,
+                                path_type,
+                                service,
+                                port,
+                            });
+                        }
+                    }
+
+                    rules_info.push(crate::types::IngressRule {
+                        host,
+                        paths: paths_info,
+                    });
                 }
             }
 
@@ -669,6 +729,7 @@ pub async fn list_ingresses(client: Client, namespace: &str) -> Result<Vec<Ingre
             addresses,
             age,
             tls: has_tls,
+            rules: rules_info,
         });
     }
 
@@ -733,12 +794,101 @@ pub async fn list_istio_virtual_services(
             .map(|ts| format_age(&ts.0))
             .unwrap_or_else(|| "Unknown".to_string());
 
+        // Extract routing destinations from HTTP routes
+        let mut routes = Vec::new();
+        if let Some(http_routes) = spec.and_then(|s| s.get("http")).and_then(|h| h.as_array()) {
+            for http_route in http_routes {
+                // Extract match conditions
+                let mut match_conditions = Vec::new();
+                if let Some(matches) = http_route.get("match").and_then(|m| m.as_array()) {
+                    for match_cond in matches {
+                        let uri_prefix = match_cond
+                            .get("uri")
+                            .and_then(|u| u.get("prefix"))
+                            .and_then(|p| p.as_str())
+                            .map(String::from);
+
+                        let uri_exact = match_cond
+                            .get("uri")
+                            .and_then(|u| u.get("exact"))
+                            .and_then(|e| e.as_str())
+                            .map(String::from);
+
+                        let uri_regex = match_cond
+                            .get("uri")
+                            .and_then(|u| u.get("regex"))
+                            .and_then(|r| r.as_str())
+                            .map(String::from);
+
+                        let headers = match_cond
+                            .get("headers")
+                            .and_then(|h| h.as_object())
+                            .map(|obj| {
+                                obj.keys()
+                                    .map(|k| k.to_string())
+                                    .collect::<Vec<_>>()
+                            })
+                            .unwrap_or_default();
+
+                        match_conditions.push(crate::types::RouteMatch {
+                            uri_prefix,
+                            uri_exact,
+                            uri_regex,
+                            headers,
+                        });
+                    }
+                }
+
+                // If no match conditions, add a default one (catches all)
+                if match_conditions.is_empty() {
+                    match_conditions.push(crate::types::RouteMatch {
+                        uri_prefix: Some("/".to_string()),
+                        uri_exact: None,
+                        uri_regex: None,
+                        headers: Vec::new(),
+                    });
+                }
+
+                // Extract route destinations
+                if let Some(route_destinations) = http_route.get("route").and_then(|r| r.as_array()) {
+                    for dest in route_destinations {
+                        if let Some(destination) = dest.get("destination") {
+                            let host = destination
+                                .get("host")
+                                .and_then(|h| h.as_str())
+                                .unwrap_or("unknown")
+                                .to_string();
+
+                            let port = destination
+                                .get("port")
+                                .and_then(|p| p.get("number"))
+                                .and_then(|n| n.as_u64())
+                                .map(|n| n as u16);
+
+                            let weight = dest
+                                .get("weight")
+                                .and_then(|w| w.as_u64())
+                                .map(|w| w as u16);
+
+                            routes.push(crate::types::VirtualServiceRoute {
+                                match_conditions: match_conditions.clone(),
+                                destination_host: host,
+                                destination_port: port,
+                                weight,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
         result.push(IstioVirtualServiceInfo {
             name,
             namespace,
             hosts,
             gateways,
             age,
+            routes,
         });
     }
 
@@ -2420,6 +2570,16 @@ pub async fn get_pods_for_resource(
             })
             .unwrap_or_default();
 
+        // Extract labels from pod metadata (convert BTreeMap to HashMap)
+        let labels = pod.metadata.labels.as_ref().map(|l| {
+            l.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+        });
+
+        // Extract annotations from pod metadata (convert BTreeMap to HashMap)
+        let annotations = pod.metadata.annotations.as_ref().map(|a| {
+            a.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+        });
+
         result.push(PodInfo {
             name,
             namespace,
@@ -2430,6 +2590,8 @@ pub async fn get_pods_for_resource(
             node,
             ip,
             ports,
+            labels,
+            annotations,
         });
     }
 

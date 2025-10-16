@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNodes } from "../../hooks/useKube";
+import { useNodes, useClusterMetricsData } from "../../hooks/useKube";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/Table";
 import { RefreshCw, Search, X, Cpu, MemoryStick, Server, Box, Activity, ExternalLink, HardDrive, Network, Calendar, Code, Ban, CircleSlash, Unplug, Trash2, FileText } from "lucide-react";
-import { NodeInfo } from "../../types";
+import { NodeInfo, NodeMetrics } from "../../types";
 import { YamlViewer } from "../../components/YamlViewer";
 import { api } from "../../lib/api";
 import { useAppStore } from "../../lib/store";
@@ -60,6 +60,20 @@ const calculatePercentage = (allocatable: string, capacity: string, isMemory: bo
   }
 };
 
+// Helpers for metrics formatting
+const formatBytes = (bytes: number): string => {
+  const gb = bytes / (1024 ** 3);
+  if (gb >= 1) return `${gb.toFixed(1)}GB`;
+  const mb = bytes / (1024 ** 2);
+  if (mb >= 1) return `${mb.toFixed(1)}MB`;
+  return `${(bytes / 1024).toFixed(1)}KB`;
+};
+
+const formatCoresFromNumber = (cores: number): string => {
+  if (cores < 1) return `${Math.round(cores * 1000)}m`;
+  return `${cores.toFixed(2)} cores`;
+};
+
 interface ResourceBarProps {
   label: string;
   allocatable: string;
@@ -105,12 +119,13 @@ function ResourceBar({ label, allocatable, capacity, isMemory = false, icon }: R
 
 interface NodeDetailModalProps {
   node: NodeInfo | null;
+  nodeMetrics?: NodeMetrics | null;
   onClose: () => void;
   onViewYaml: (node: NodeInfo) => void;
   onViewDescribe: (node: NodeInfo) => void;
 }
 
-function NodeDetailModal({ node, onClose, onViewYaml, onViewDescribe }: NodeDetailModalProps) {
+function NodeDetailModal({ node, nodeMetrics, onClose, onViewYaml, onViewDescribe }: NodeDetailModalProps) {
   const [isOperating, setIsOperating] = useState(false);
   const [operationError, setOperationError] = useState<string | null>(null);
 
@@ -366,6 +381,81 @@ function NodeDetailModal({ node, onClose, onViewYaml, onViewDescribe }: NodeDeta
               )}
             </div>
           </div>
+
+          {/* Real-time Metrics Section */}
+          {nodeMetrics && (
+            <div>
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-primary" />
+                Real-time Usage
+              </h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* CPU Usage */}
+                <div className="p-6 rounded-lg bg-muted/30 border border-border/50">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Cpu className="w-5 h-5 text-muted-foreground" />
+                    <h4 className="font-semibold">CPU Usage</h4>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between items-baseline mb-2">
+                        <span className="text-2xl font-bold">{nodeMetrics.cpu_usage}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {formatCoresFromNumber(nodeMetrics.cpu_usage_cores)}
+                        </span>
+                      </div>
+                      <div className="h-3 bg-muted/50 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-foreground/70 transition-all duration-500"
+                          style={{
+                            width: `${Math.min((nodeMetrics.cpu_usage_cores / parseCPU(node.cpu_capacity)) * 100, 100)}%`
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                        <span>Current usage</span>
+                        <span>
+                          {((nodeMetrics.cpu_usage_cores / parseCPU(node.cpu_capacity)) * 100).toFixed(1)}% of capacity
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Memory Usage */}
+                <div className="p-6 rounded-lg bg-muted/30 border border-border/50">
+                  <div className="flex items-center gap-2 mb-4">
+                    <MemoryStick className="w-5 h-5 text-muted-foreground" />
+                    <h4 className="font-semibold">Memory Usage</h4>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between items-baseline mb-2">
+                        <span className="text-2xl font-bold">{nodeMetrics.memory_usage}</span>
+                        <span className="text-sm text-muted-foreground">
+                          {formatBytes(nodeMetrics.memory_usage_bytes)}
+                        </span>
+                      </div>
+                      <div className="h-3 bg-muted/50 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-foreground/70 transition-all duration-500"
+                          style={{
+                            width: `${Math.min((nodeMetrics.memory_usage_bytes / (parseMemory(node.memory_capacity) * 1024 ** 3)) * 100, 100)}%`
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                        <span>Current usage</span>
+                        <span>
+                          {((nodeMetrics.memory_usage_bytes / (parseMemory(node.memory_capacity) * 1024 ** 3)) * 100).toFixed(1)}% of capacity
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Node Information Section */}
           <div>
@@ -636,6 +726,7 @@ function NodeDescribeViewer({ nodeName, onClose }: NodeDescribeViewerProps) {
 
 export function NodesList() {
   const { data: nodes, isLoading, error, refetch } = useNodes();
+  const { data: clusterMetricsData } = useClusterMetricsData();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedNode, setSelectedNode] = useState<NodeInfo | null>(null);
   const [selectedNodeForYaml, setSelectedNodeForYaml] = useState<NodeInfo | null>(null);
@@ -645,6 +736,12 @@ export function NodesList() {
     if (status === "Ready") return "success";
     if (status === "NotReady") return "destructive";
     return "secondary";
+  };
+
+  // Helper to get node metrics by name
+  const getNodeMetrics = (nodeName: string): NodeMetrics | null => {
+    if (!clusterMetricsData?.node_metrics) return null;
+    return clusterMetricsData.node_metrics.find(m => m.name === nodeName) || null;
   };
 
   // Filter nodes based on search query
@@ -773,6 +870,7 @@ export function NodesList() {
                 {filteredNodes.map((node) => {
                   const cpuPercent = calculatePercentage(node.cpu_allocatable, node.cpu_capacity, false);
                   const memoryPercent = calculatePercentage(node.memory_allocatable, node.memory_capacity, true);
+                  const metrics = getNodeMetrics(node.name);
 
                   return (
                     <TableRow
@@ -813,43 +911,81 @@ export function NodesList() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 min-w-[60px]">
-                            <div className="text-xs text-muted-foreground mb-1">
-                              {formatCPU(node.cpu_allocatable)} / {formatCPU(node.cpu_capacity)}
-                            </div>
-                            <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all ${
-                                  cpuPercent > 90
-                                    ? "bg-green-500"
-                                    : cpuPercent > 70
-                                    ? "bg-blue-500"
-                                    : "bg-purple-500"
-                                }`}
-                                style={{ width: `${cpuPercent}%` }}
-                              />
-                            </div>
+                          <div className="flex-1 min-w-[80px]">
+                            {metrics ? (
+                              <>
+                                <div className="text-xs font-medium mb-1">
+                                  {metrics.cpu_usage}
+                                </div>
+                                <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden mb-1">
+                                  <div
+                                    className="h-full bg-foreground/70 rounded-full transition-all"
+                                    style={{ width: `${Math.min((metrics.cpu_usage_cores / parseCPU(node.cpu_capacity)) * 100, 100)}%` }}
+                                  />
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {formatCoresFromNumber(metrics.cpu_usage_cores)} / {formatCPU(node.cpu_capacity)}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="text-xs text-muted-foreground mb-1">
+                                  {formatCPU(node.cpu_allocatable)} / {formatCPU(node.cpu_capacity)}
+                                </div>
+                                <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all ${
+                                      cpuPercent > 90
+                                        ? "bg-green-500"
+                                        : cpuPercent > 70
+                                        ? "bg-blue-500"
+                                        : "bg-purple-500"
+                                    }`}
+                                    style={{ width: `${cpuPercent}%` }}
+                                  />
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 min-w-[60px]">
-                            <div className="text-xs text-muted-foreground mb-1">
-                              {formatMemory(node.memory_allocatable)} / {formatMemory(node.memory_capacity)}
-                            </div>
-                            <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all ${
-                                  memoryPercent > 90
-                                    ? "bg-green-500"
-                                    : memoryPercent > 70
-                                    ? "bg-blue-500"
-                                    : "bg-purple-500"
-                                }`}
-                                style={{ width: `${memoryPercent}%` }}
-                              />
-                            </div>
+                          <div className="flex-1 min-w-[80px]">
+                            {metrics ? (
+                              <>
+                                <div className="text-xs font-medium mb-1">
+                                  {metrics.memory_usage}
+                                </div>
+                                <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden mb-1">
+                                  <div
+                                    className="h-full bg-foreground/70 rounded-full transition-all"
+                                    style={{ width: `${Math.min((metrics.memory_usage_bytes / (parseMemory(node.memory_capacity) * 1024 ** 3)) * 100, 100)}%` }}
+                                  />
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {formatBytes(metrics.memory_usage_bytes)} / {formatMemory(node.memory_capacity)}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="text-xs text-muted-foreground mb-1">
+                                  {formatMemory(node.memory_allocatable)} / {formatMemory(node.memory_capacity)}
+                                </div>
+                                <div className="h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all ${
+                                      memoryPercent > 90
+                                        ? "bg-green-500"
+                                        : memoryPercent > 70
+                                        ? "bg-blue-500"
+                                        : "bg-purple-500"
+                                    }`}
+                                    style={{ width: `${memoryPercent}%` }}
+                                  />
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                       </TableCell>
@@ -885,6 +1021,7 @@ export function NodesList() {
       {selectedNode && (
         <NodeDetailModal
           node={selectedNode}
+          nodeMetrics={getNodeMetrics(selectedNode.name)}
           onClose={() => setSelectedNode(null)}
           onViewYaml={(node) => {
             setSelectedNodeForYaml(node);

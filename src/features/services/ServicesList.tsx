@@ -1,4 +1,4 @@
-import { useServices, useDeleteService } from "../../hooks/useKube";
+import { useServices, useDeleteService, usePods } from "../../hooks/useKube";
 import { useAppStore } from "../../lib/store";
 import {
   Table,
@@ -10,22 +10,47 @@ import {
 } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
-import { RefreshCw, Search, X, Code, ArrowRightLeft, Trash2, FileText } from "lucide-react";
-import { useState, useMemo } from "react";
+import { RefreshCw, Search, X, Code, ArrowRightLeft, Trash2, FileText, ChevronDown, ChevronRight, Network } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
 import { YamlViewer } from "../../components/YamlViewer";
 import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer";
 import { PortForwardModal } from "../../components/PortForwardModal";
+import { PodInfo, ServiceInfo } from "../../types";
+
+// Utility function to check if a service selector matches pod labels
+function serviceSelectorMatchesPodLabels(
+  serviceSelector: Record<string, string> | undefined,
+  podLabels: Record<string, string> | undefined
+): boolean {
+  if (!serviceSelector || Object.keys(serviceSelector).length === 0) {
+    return false;
+  }
+  if (!podLabels) {
+    return false;
+  }
+
+  // All service selector labels must match pod labels
+  return Object.entries(serviceSelector).every(
+    ([key, value]) => podLabels[key] === value
+  );
+}
 
 export function ServicesList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
+  const serviceSearchFilter = useAppStore((state) => state.serviceSearchFilter);
+  const setServiceSearchFilter = useAppStore((state) => state.setServiceSearchFilter);
+  const setCurrentView = useAppStore((state) => state.setCurrentView);
+  const setPodSearchFilter = useAppStore((state) => state.setPodSearchFilter);
   const showNamespaceColumn = !currentNamespace;
   const { data: services, isLoading, error, refetch } = useServices(currentNamespace);
+  const { data: pods } = usePods(currentNamespace);
   const deleteService = useDeleteService();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedResource, setSelectedResource] = useState<{name: string; namespace: string} | null>(null);
   const [selectedServiceForDescribe, setSelectedServiceForDescribe] = useState<{name: string; namespace: string} | null>(null);
   const [selectedServiceForPortForward, setSelectedServiceForPortForward] = useState<{name: string; namespace: string} | null>(null);
   const [serviceToDelete, setServiceToDelete] = useState<string | null>(null);
+  const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set());
 
   const handleDelete = (serviceName: string) => {
     setServiceToDelete(serviceName);
@@ -47,6 +72,50 @@ export function ServicesList() {
   const cancelDelete = () => {
     setServiceToDelete(null);
   };
+
+  const toggleServiceExpand = (serviceName: string) => {
+    const newExpanded = new Set(expandedServices);
+    if (newExpanded.has(serviceName)) {
+      newExpanded.delete(serviceName);
+    } else {
+      newExpanded.add(serviceName);
+    }
+    setExpandedServices(newExpanded);
+  };
+
+  const navigateToPod = (podName?: string) => {
+    if (podName) {
+      setPodSearchFilter(podName);
+    } else {
+      setPodSearchFilter(undefined);
+    }
+    setCurrentView("pods");
+  };
+
+  // Compute matched pods for each service
+  const servicePodsMap = useMemo(() => {
+    if (!services || !pods) return new Map<string, PodInfo[]>();
+
+    const map = new Map<string, PodInfo[]>();
+    services.forEach((service) => {
+      const matchedPods = pods.filter((pod) =>
+        // Match namespace and selector
+        pod.namespace === service.namespace &&
+        serviceSelectorMatchesPodLabels(service.selector, pod.labels)
+      );
+      map.set(service.name, matchedPods);
+    });
+    return map;
+  }, [services, pods]);
+
+  // Apply search filter from navigation
+  useEffect(() => {
+    if (serviceSearchFilter) {
+      setSearchQuery(serviceSearchFilter);
+      // Clear the filter after applying it
+      setServiceSearchFilter(undefined);
+    }
+  }, [serviceSearchFilter, setServiceSearchFilter]);
 
   const getTypeVariant = (type: string) => {
     switch (type) {
@@ -173,12 +242,14 @@ export function ServicesList() {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10"></TableHead>
             <TableHead>Name</TableHead>
             {showNamespaceColumn && <TableHead>Namespace</TableHead>}
             <TableHead>Type</TableHead>
             <TableHead>Cluster IP</TableHead>
             <TableHead>External IP</TableHead>
             <TableHead>Ports</TableHead>
+            <TableHead>Pods</TableHead>
             <TableHead>Age</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
@@ -186,71 +257,190 @@ export function ServicesList() {
         <TableBody>
           {filteredServices.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+              <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                 {searchQuery ? `No services found matching "${searchQuery}"` : "No services found"}
               </TableCell>
             </TableRow>
           ) : (
-            filteredServices.map((service) => (
-            <TableRow key={service.name}>
-              <TableCell className="font-medium">{service.name}</TableCell>
-              {showNamespaceColumn && <TableCell>{service.namespace}</TableCell>}
-              <TableCell>
-                <Badge variant={getTypeVariant(service.service_type)}>
-                  {service.service_type}
-                </Badge>
-              </TableCell>
-              <TableCell className="font-mono text-sm">
-                {service.cluster_ip}
-              </TableCell>
-              <TableCell className="font-mono text-sm text-muted-foreground">
-                {service.external_ip || "-"}
-              </TableCell>
-              <TableCell className="font-mono text-sm">
-                {service.ports}
-              </TableCell>
-              <TableCell>{service.age}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-1">
-                  {service.ports && service.ports !== "-" && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setSelectedServiceForPortForward({name: service.name, namespace: service.namespace})}
-                      title={`Port Forward (${service.ports})`}
-                    >
-                      <ArrowRightLeft className="w-4 h-4" />
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSelectedResource({name: service.name, namespace: service.namespace})}
-                    title="View YAML"
-                  >
-                    <Code className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSelectedServiceForDescribe({name: service.name, namespace: service.namespace})}
-                    title="Describe"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(service.name)}
-                    disabled={deleteService.isPending}
-                    title="Delete service"
-                  >
-                    <Trash2 className="w-4 h-4 text-destructive" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-            ))
+            filteredServices.flatMap((service) => {
+              const matchedPods = servicePodsMap.get(service.name) || [];
+              const isExpanded = expandedServices.has(service.name);
+              const colSpan = showNamespaceColumn ? 10 : 9;
+
+              return [
+                // Main service row
+                <TableRow key={service.name}>
+                  <TableCell>
+                    {matchedPods.length > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => toggleServiceExpand(service.name)}
+                        className="h-6 w-6"
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                      </Button>
+                    )}
+                  </TableCell>
+                  <TableCell className="font-medium">{service.name}</TableCell>
+                  {showNamespaceColumn && <TableCell>{service.namespace}</TableCell>}
+                  <TableCell>
+                    <Badge variant={getTypeVariant(service.service_type)}>
+                      {service.service_type}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="font-mono text-sm">
+                    {service.cluster_ip}
+                  </TableCell>
+                  <TableCell className="font-mono text-sm text-muted-foreground">
+                    {service.external_ip || "-"}
+                  </TableCell>
+                  <TableCell className="font-mono text-sm">
+                    {service.ports}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={matchedPods.length > 0 ? "default" : "secondary"}>
+                      {matchedPods.length} {matchedPods.length === 1 ? "pod" : "pods"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{service.age}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {service.ports && service.ports !== "-" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setSelectedServiceForPortForward({name: service.name, namespace: service.namespace})}
+                          title={`Port Forward (${service.ports})`}
+                        >
+                          <ArrowRightLeft className="w-4 h-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setSelectedResource({name: service.name, namespace: service.namespace})}
+                        title="View YAML"
+                      >
+                        <Code className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setSelectedServiceForDescribe({name: service.name, namespace: service.namespace})}
+                        title="Describe"
+                      >
+                        <FileText className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(service.name)}
+                        disabled={deleteService.isPending}
+                        title="Delete service"
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>,
+                // Expandable row for visual flow
+                ...(isExpanded && matchedPods.length > 0
+                  ? [
+                      <TableRow key={`${service.name}-pods`} className="bg-muted/20">
+                        <TableCell colSpan={colSpan}>
+                          <div className="px-4 py-3">
+                            <h4 className="text-sm font-semibold mb-3 text-muted-foreground">
+                              Service → Pods Flow
+                            </h4>
+                            <div className="p-4 rounded-lg bg-gradient-to-r from-background/80 to-background/60 border border-border/50">
+                              {/* Flow visualization */}
+                              <div className="flex items-center gap-3 flex-wrap">
+                                {/* Service */}
+                                <div className="flex-shrink-0 p-3 rounded-md bg-green-500/10 border border-green-500/30">
+                                  <div className="text-xs text-muted-foreground mb-1">SERVICE</div>
+                                  <div className="flex items-center gap-2">
+                                    <Network className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                    <span className="font-mono text-sm text-green-600 dark:text-green-400">
+                                      {service.name}
+                                    </span>
+                                  </div>
+                                  <div className="mt-1 flex flex-wrap gap-1">
+                                    <Badge variant="outline" className="text-xs">
+                                      {service.service_type}
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs">
+                                      {service.ports}
+                                    </Badge>
+                                  </div>
+                                </div>
+
+                                {/* Arrow */}
+                                <div className="flex items-center gap-1 text-muted-foreground">
+                                  <div className="w-8 h-0.5 bg-border"></div>
+                                  <span className="text-lg">→</span>
+                                </div>
+
+                                {/* Pods */}
+                                <div className="flex-shrink-0 p-3 rounded-md bg-purple-500/10 border border-purple-500/30">
+                                  <div className="text-xs text-muted-foreground mb-2">
+                                    PODS ({matchedPods.length})
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    {matchedPods.slice(0, 5).map((pod) => (
+                                      <div
+                                        key={pod.name}
+                                        className="flex items-center gap-2 text-xs cursor-pointer hover:bg-purple-500/10 p-1 rounded transition-colors"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          navigateToPod(pod.name);
+                                        }}
+                                        title={`Click to view ${pod.name}`}
+                                      >
+                                        <div
+                                          className={`w-2 h-2 rounded-full ${
+                                            pod.status === "Running"
+                                              ? "bg-green-500"
+                                              : pod.status === "Pending"
+                                              ? "bg-yellow-500"
+                                              : "bg-red-500"
+                                          }`}
+                                        ></div>
+                                        <span className="font-mono text-purple-600 dark:text-purple-400 truncate max-w-[200px]">
+                                          {pod.name}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                          {pod.ready}
+                                        </span>
+                                      </div>
+                                    ))}
+                                    {matchedPods.length > 5 && (
+                                      <div
+                                        className="text-xs text-muted-foreground pl-4 cursor-pointer hover:text-foreground transition-colors"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          navigateToPod();
+                                        }}
+                                        title="Click to view all pods"
+                                      >
+                                        +{matchedPods.length - 5} more
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>,
+                    ]
+                  : []),
+              ];
+            })
           )}
         </TableBody>
       </Table>

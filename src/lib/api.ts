@@ -25,6 +25,8 @@ import type {
   PortForwardInfo,
   HelmRelease,
   HelmReleaseDetail,
+  MetricsCapabilities,
+  ClusterMetricsData,
 } from "../types";
 
 export const api = {
@@ -66,6 +68,16 @@ export const api = {
       podName,
       container,
       tailLines,
+    });
+  },
+
+  async getPodContainers(
+    namespace: string,
+    podName: string
+  ): Promise<string[]> {
+    return await invoke("get_pod_containers", {
+      namespace,
+      podName,
     });
   },
 
@@ -469,5 +481,18 @@ export const api = {
     values?: string
   ): Promise<string> {
     return await invoke("helm_upgrade_release", { name, chart, namespace, values });
+  },
+
+  // Metrics operations
+  async detectMetricsCapabilities(): Promise<MetricsCapabilities> {
+    return await invoke("detect_metrics_capabilities");
+  },
+
+  async getClusterMetricsData(): Promise<ClusterMetricsData> {
+    return await invoke("get_cluster_metrics_data");
+  },
+
+  async getNamespacePodMetrics(namespace?: string): Promise<PodMetrics[]> {
+    return await invoke("get_namespace_pod_metrics", { namespace });
   },
 };
