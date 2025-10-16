@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useSecrets, useDeleteSecret } from "../../hooks/useKube";
 import { useAppStore } from "../../lib/store";
+import { useToastStore } from "../../lib/toastStore";
 import {
   Table,
   TableBody,
@@ -266,62 +267,136 @@ interface SecretViewerProps {
 
 function SecretViewer({ secret, onClose }: SecretViewerProps) {
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+  const addToast = useToastStore((state) => state.addToast);
+
+  const allRevealed = Object.keys(secret.data).every(key => revealed[key]);
+  const someRevealed = Object.keys(secret.data).some(key => revealed[key]);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [onClose]);
 
   const toggleReveal = (key: string) => {
     setRevealed((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const toggleRevealAll = () => {
+    if (allRevealed) {
+      // Hide all
+      setRevealed({});
+    } else {
+      // Reveal all
+      const newRevealed: Record<string, boolean> = {};
+      Object.keys(secret.data).forEach(key => {
+        newRevealed[key] = true;
+      });
+      setRevealed(newRevealed);
+    }
+  };
+
+  const handleCopy = (key: string, value: string) => {
+    navigator.clipboard.writeText(value);
+    addToast(`Copied "${key}" to clipboard`, "success");
+  };
+
   const maskValue = (value: string) => {
-    return "•".repeat(Math.min(value.length, 20));
+    return "•".repeat(Math.min(value.length, 32));
   };
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="bg-background border border-border rounded-lg shadow-lg w-[90%] h-[80%] flex flex-col"
+        className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <div>
-            <h2 className="text-xl font-bold">{secret.name}</h2>
-            <p className="text-sm text-muted-foreground">
-              {secret.secret_type} • {secret.keys} keys • {secret.age}
-            </p>
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-border bg-gradient-to-r from-background to-muted/20">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 flex items-center justify-center">
+              <Eye className="w-5 h-5 text-yellow-500" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">{secret.name}</h2>
+              <p className="text-sm text-muted-foreground">
+                {secret.secret_type} • {secret.keys} {secret.keys === 1 ? 'key' : 'keys'} • {secret.age}
+              </p>
+            </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Close (ESC)
-          </Button>
+          <div className="flex items-center gap-2">
+            {secret.keys > 1 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleRevealAll}
+                className="gap-2"
+              >
+                {allRevealed ? (
+                  <>
+                    <EyeOff className="w-4 h-4" />
+                    Hide All
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4" />
+                    Reveal All
+                  </>
+                )}
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={onClose} className="gap-2">
+              <X className="w-4 h-4" />
+              Close
+            </Button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-4">
-          <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-500 rounded-lg p-3 mb-4">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
-              ⚠️ <strong>Warning:</strong> Secret data is sensitive. Be careful when revealing or copying values.
-            </p>
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
+          {/* Warning Banner */}
+          <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-yellow-900 dark:text-yellow-100">
+                Sensitive Data
+              </p>
+              <p className="text-xs text-yellow-800 dark:text-yellow-200/80 mt-1">
+                Secret values are hidden by default. Be careful when revealing or copying values.
+              </p>
+            </div>
           </div>
 
           <div className="space-y-4">
             {Object.entries(secret.data).map(([key, value]) => (
-              <div key={key} className="border border-border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-lg">{key}</h3>
+              <div key={key} className="border border-border/50 rounded-xl p-5 bg-gradient-to-br from-background to-muted/10 hover:border-primary/30 transition-all duration-200">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-base flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${revealed[key] ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                    {key}
+                  </h3>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => toggleReveal(key)}
+                      className="gap-2"
                     >
                       {revealed[key] ? (
                         <>
-                          <EyeOff className="w-4 h-4 mr-2" />
+                          <EyeOff className="w-4 h-4" />
                           Hide
                         </>
                       ) : (
                         <>
-                          <Eye className="w-4 h-4 mr-2" />
+                          <Eye className="w-4 h-4" />
                           Reveal
                         </>
                       )}
@@ -329,16 +404,20 @@ function SecretViewer({ secret, onClose }: SecretViewerProps) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(value);
-                      }}
+                      onClick={() => handleCopy(key, value)}
                       disabled={!revealed[key]}
+                      className="gap-2"
                     >
+                      <Eye className="w-4 h-4" />
                       Copy
                     </Button>
                   </div>
                 </div>
-                <pre className="bg-muted p-3 rounded text-sm overflow-x-auto">
+                <pre className={`p-4 rounded-lg text-sm overflow-x-auto font-mono border border-border/50 transition-all ${
+                  revealed[key]
+                    ? 'bg-muted/50'
+                    : 'bg-yellow-500/5 blur-[2px] select-none'
+                }`}>
                   {revealed[key] ? value : maskValue(value)}
                 </pre>
               </div>

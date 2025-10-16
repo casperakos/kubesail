@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useConfigMaps, useDeleteConfigMap } from "../../hooks/useKube";
 import { useAppStore } from "../../lib/store";
+import { useToastStore } from "../../lib/toastStore";
 import {
   Table,
   TableBody,
@@ -252,44 +253,72 @@ interface ConfigMapViewerProps {
 }
 
 function ConfigMapViewer({ configmap, onClose }: ConfigMapViewerProps) {
+  const addToast = useToastStore((state) => state.addToast);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [onClose]);
+
+  const handleCopy = (key: string, value: string) => {
+    navigator.clipboard.writeText(value);
+    addToast(`Copied "${key}" to clipboard`, "success");
+  };
+
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="bg-background border border-border rounded-lg shadow-lg w-[90%] h-[80%] flex flex-col"
+        className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <div>
-            <h2 className="text-xl font-bold">{configmap.name}</h2>
-            <p className="text-sm text-muted-foreground">
-              {configmap.keys} keys • {configmap.age}
-            </p>
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-border bg-gradient-to-r from-background to-muted/20">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30 flex items-center justify-center">
+              <FileText className="w-5 h-5 text-blue-500" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">{configmap.name}</h2>
+              <p className="text-sm text-muted-foreground">
+                {configmap.keys} {configmap.keys === 1 ? 'key' : 'keys'} • {configmap.age}
+              </p>
+            </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Close (ESC)
+          <Button variant="ghost" size="sm" onClick={onClose} className="gap-2">
+            <X className="w-4 h-4" />
+            Close
           </Button>
         </div>
 
-        <div className="flex-1 overflow-auto p-4">
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6">
           <div className="space-y-4">
             {Object.entries(configmap.data).map(([key, value]) => (
-              <div key={key} className="border border-border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-lg">{key}</h3>
+              <div key={key} className="border border-border/50 rounded-xl p-5 bg-gradient-to-br from-background to-muted/10 hover:border-primary/30 transition-all duration-200">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-base flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                    {key}
+                  </h3>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => {
-                      navigator.clipboard.writeText(value);
-                    }}
+                    onClick={() => handleCopy(key, value)}
+                    className="gap-2"
                   >
+                    <Eye className="w-4 h-4" />
                     Copy
                   </Button>
                 </div>
-                <pre className="bg-muted p-3 rounded text-sm overflow-x-auto">
+                <pre className="bg-muted/50 p-4 rounded-lg text-sm overflow-x-auto font-mono border border-border/50">
                   {value}
                 </pre>
               </div>
