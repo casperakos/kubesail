@@ -141,7 +141,7 @@ const getControllerIcon = (controllerId: string) => {
 export function Sidebar() {
   const currentView = useAppStore((state) => state.currentView);
   const setCurrentView = useAppStore((state) => state.setCurrentView);
-  const { data: controllers } = useControllerDetection();
+  const { data: controllers = [] } = useControllerDetection();
   const { data: namespaces, isError, isFetching, isSuccess } = useNamespaces();
   const { data: portForwards } = usePortForwards();
 
@@ -153,8 +153,8 @@ export function Sidebar() {
   const activePortForwardsCount = portForwards?.filter(pf => pf.status === 'running').length || 0;
 
   // Check which quick access controllers are installed
-  const hasArgoWorkflows = controllers?.some(c => c.id === 'argo-workflows');
-  const hasArgoCD = controllers?.some(c => c.id === 'argocd');
+  const hasArgoWorkflows = controllers.some(c => c.id === 'argo-workflows');
+  const hasArgoCD = controllers.some(c => c.id === 'argocd');
   const hasQuickAccess = hasArgoWorkflows || hasArgoCD;
 
   // Default expanded sections (Quick Access only if it has items)

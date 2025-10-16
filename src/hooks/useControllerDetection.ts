@@ -108,11 +108,15 @@ export function useControllerDetection() {
         return detectedControllers.filter((c) => c.detected);
       } catch (error) {
         console.error("Error detecting controllers:", error);
-        return [];
+        // Re-throw the error so React Query can handle it properly
+        throw error;
       }
     },
     refetchInterval: 60000, // Refresh every 60 seconds
     staleTime: 30000, // Consider data stale after 30 seconds
+    retry: 2, // Retry twice on failure
+    retryDelay: 1000, // Wait 1s between retries
+    placeholderData: (previousData) => previousData, // Keep previous data while refetching
   });
 }
 
