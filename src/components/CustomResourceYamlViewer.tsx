@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Editor from "@monaco-editor/react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "./ui/Button";
-import { X, Download, Copy, Check, RefreshCw } from "lucide-react";
+import { X, Download, Copy, Check, RefreshCw, Save, Edit3 } from "lucide-react";
 import { useAppStore } from "../lib/store";
 
 interface CustomResourceYamlViewerProps {
@@ -24,9 +24,13 @@ export function CustomResourceYamlViewer({
 }: CustomResourceYamlViewerProps) {
   const theme = useAppStore((state) => state.theme);
   const [yaml, setYaml] = useState<string>("");
+  const [originalYaml, setOriginalYaml] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
 
   const fetchYaml = async () => {
     setLoading(true);
@@ -40,12 +44,55 @@ export function CustomResourceYamlViewer({
         namespace: namespace || null,
       });
       setYaml(yamlContent);
+      setOriginalYaml(yamlContent);
+      setHasChanges(false);
+      setIsEditing(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch YAML");
     } finally {
       setLoading(false);
     }
   };
+
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setYaml(originalYaml);
+    setIsEditing(false);
+    setHasChanges(false);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await invoke("update_custom_resource_yaml", {
+        group,
+        version,
+        plural,
+        name: resourceName,
+        namespace: namespace || null,
+        yaml,
+      });
+      setOriginalYaml(yaml);
+      setHasChanges(false);
+      setIsEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save YAML");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleYamlChange = (value: string | undefined) => {
+    const newValue = value || "";
+    setYaml(newValue);
+    setHasChanges(newValue !== originalYaml);
+  };
+
+  // Force HMR update
 
   useEffect(() => {
     fetchYaml();
@@ -86,27 +133,55 @@ export function CustomResourceYamlViewer({
           <div className="flex items-center gap-2">
             {!loading && !error && (
               <>
-                <Button onClick={fetchYaml} variant="ghost" size="sm">
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Refresh
-                </Button>
-                <Button onClick={copyToClipboard} variant="ghost" size="sm">
-                  {copied ? (
-                    <>
-                      <Check className="w-4 h-4 mr-2" />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copy
-                    </>
-                  )}
-                </Button>
-                <Button onClick={downloadYaml} variant="ghost" size="sm">
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </Button>
+                {!isEditing ? (
+                  <>
+                    <Button onClick={handleEdit} variant="default" size="sm">
+                      <Edit3 className="w-4 h-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button onClick={fetchYaml} variant="ghost" size="sm">
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Refresh
+                    </Button>
+                    <Button onClick={copyToClipboard} variant="ghost" size="sm">
+                      {copied ? (
+                        <>
+                          <Check className="w-4 h-4 mr-2" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4 mr-2" />
+                          Copy
+                        </>
+                      )}
+                    </Button>
+                    <Button onClick={downloadYaml} variant="ghost" size="sm">
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      onClick={handleSave}
+                      disabled={!hasChanges || saving}
+                      variant="default"
+                      size="sm"
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      {saving ? "Saving..." : "Save"}
+                    </Button>
+                    <Button
+                      onClick={handleCancelEdit}
+                      disabled={saving}
+                      variant="ghost"
+                      size="sm"
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                )}
               </>
             )}
             <Button onClick={onClose} variant="ghost" size="sm">
@@ -144,9 +219,10 @@ export function CustomResourceYamlViewer({
                 height="100%"
                 defaultLanguage="yaml"
                 value={yaml}
+                onChange={handleYamlChange}
                 theme={theme === "dark" ? "vs-dark" : "light"}
                 options={{
-                  readOnly: true,
+                  readOnly: !isEditing,
                   minimap: { enabled: false },
                   fontSize: 13,
                   lineNumbers: "on",

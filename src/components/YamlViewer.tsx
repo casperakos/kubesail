@@ -30,6 +30,27 @@ export function YamlViewer({
   const [applySuccess, setApplySuccess] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
   const editorRef = useRef<any>(null);
+  const isEditModeRef = useRef(isEditMode);
+  const applyingRef = useRef(applying);
+  const editedYamlRef = useRef(editedYaml);
+  const yamlRef = useRef(yaml);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    isEditModeRef.current = isEditMode;
+  }, [isEditMode]);
+
+  useEffect(() => {
+    applyingRef.current = applying;
+  }, [applying]);
+
+  useEffect(() => {
+    editedYamlRef.current = editedYaml;
+  }, [editedYaml]);
+
+  useEffect(() => {
+    yamlRef.current = yaml;
+  }, [yaml]);
 
   const fetchYaml = async () => {
     setLoading(true);
@@ -81,30 +102,33 @@ export function YamlViewer({
 
   useEffect(() => {
     fetchYaml();
+  }, [resourceType, resourceName, namespace]);
+
+  useEffect(() => {
     // Handle keyboard shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (isEditMode) {
+        if (isEditModeRef.current) {
           toggleEditMode();
         } else {
           onClose();
         }
       }
       // Cmd/Ctrl+S to apply changes
-      if ((e.metaKey || e.ctrlKey) && e.key === "s" && isEditMode) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s" && isEditModeRef.current) {
         e.preventDefault();
-        if (!applying && editedYaml !== yaml) {
+        if (!applyingRef.current && editedYamlRef.current !== yamlRef.current) {
           handleApply();
         }
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [resourceType, resourceName, namespace, onClose, isEditMode, applying, editedYaml, yaml]);
+  }, [onClose]);
 
   const copyToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(isEditMode ? editedYaml : yaml);
+      await navigator.clipboard.writeText(editedYaml);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -113,8 +137,7 @@ export function YamlViewer({
   };
 
   const downloadYaml = () => {
-    const content = isEditMode ? editedYaml : yaml;
-    const blob = new Blob([content], { type: "text/yaml" });
+    const blob = new Blob([editedYaml], { type: "text/yaml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -234,33 +257,64 @@ export function YamlViewer({
           )}
 
           {!loading && !error && yaml && (
-            <Editor
-              height="100%"
-              defaultLanguage="yaml"
-              theme={theme === "dark" ? "vs-dark" : "light"}
-              value={isEditMode ? editedYaml : yaml}
-              onChange={(value) => isEditMode && setEditedYaml(value || "")}
-              options={{
-                readOnly: !isEditMode,
-                minimap: { enabled: true },
-                scrollBeyondLastLine: false,
-                fontSize: 13,
-                wordWrap: "on",
-                automaticLayout: true,
-                tabSize: 2,
-                insertSpaces: true,
-              }}
-              onMount={(editor) => {
-                editorRef.current = editor;
-              }}
-            />
+            isEditMode ? (
+              <Editor
+                key="edit-mode"
+                height="100%"
+                defaultLanguage="yaml"
+                theme={theme === "dark" ? "vs-dark" : "light"}
+                value={editedYaml}
+                onChange={(value) => setEditedYaml(value || "")}
+                options={{
+                  readOnly: false,
+                  minimap: { enabled: true },
+                  scrollBeyondLastLine: false,
+                  fontSize: 13,
+                  wordWrap: "on",
+                  automaticLayout: true,
+                  tabSize: 2,
+                  insertSpaces: true,
+                  quickSuggestions: false,
+                  suggestOnTriggerCharacters: false,
+                  acceptSuggestionOnEnter: "off",
+                  tabCompletion: "off",
+                  wordBasedSuggestions: false,
+                  parameterHints: { enabled: false },
+                  hover: { enabled: false },
+                }}
+                onMount={(editor) => {
+                  editorRef.current = editor;
+                }}
+              />
+            ) : (
+              <Editor
+                key="view-mode"
+                height="100%"
+                defaultLanguage="yaml"
+                theme={theme === "dark" ? "vs-dark" : "light"}
+                value={editedYaml}
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: true },
+                  scrollBeyondLastLine: false,
+                  fontSize: 13,
+                  wordWrap: "on",
+                  automaticLayout: true,
+                  tabSize: 2,
+                  insertSpaces: true,
+                }}
+                onMount={(editor) => {
+                  editorRef.current = editor;
+                }}
+              />
+            )
           )}
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between p-4 border-t border-border/50 bg-gradient-to-r from-background/50 to-background/30 text-sm text-muted-foreground">
           <div className="flex items-center gap-4">
-            <span>{(isEditMode ? editedYaml : yaml).split("\n").length} lines</span>
+            <span>{editedYaml.split("\n").length} lines</span>
             {isEditMode && editedYaml !== yaml && (
               <Badge variant="warning" className="text-xs">Modified</Badge>
             )}

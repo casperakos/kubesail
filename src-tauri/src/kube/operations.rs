@@ -966,6 +966,43 @@ pub async fn get_custom_resource_yaml(
     Ok(yaml)
 }
 
+pub async fn update_custom_resource_yaml(
+    client: Client,
+    group: &str,
+    version: &str,
+    plural: &str,
+    name: &str,
+    namespace: Option<&str>,
+    yaml: &str,
+) -> Result<()> {
+    let api_resource = ApiResource {
+        group: group.to_string(),
+        version: version.to_string(),
+        api_version: if group.is_empty() {
+            version.to_string()
+        } else {
+            format!("{}/{}", group, version)
+        },
+        kind: plural.to_string(),
+        plural: plural.to_string(),
+    };
+
+    let api: Api<DynamicObject> = if let Some(ns) = namespace {
+        Api::namespaced_with(client, ns, &api_resource)
+    } else {
+        Api::all_with(client, &api_resource)
+    };
+
+    // Parse the YAML string to DynamicObject
+    let resource: DynamicObject = serde_yaml::from_str(yaml)?;
+
+    // Use replace to update the resource
+    let pp = kube::api::PostParams::default();
+    api.replace(name, &pp, &resource).await?;
+
+    Ok(())
+}
+
 pub async fn describe_custom_resource(
     client: Client,
     group: &str,
