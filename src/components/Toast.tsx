@@ -30,32 +30,48 @@ interface ToastProps {
 }
 
 function Toast({ message, type, onClose }: ToastProps) {
-  const icons = {
-    success: <CheckCircle2 className="w-5 h-5" />,
-    error: <XCircle className="w-5 h-5" />,
-    info: <Info className="w-5 h-5" />,
-    warning: <AlertTriangle className="w-5 h-5" />,
+  const config = {
+    success: {
+      icon: <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />,
+      bgClass: "bg-green-50 dark:bg-green-950/90",
+      borderClass: "border-green-200 dark:border-green-800",
+      textClass: "text-green-900 dark:text-green-100",
+    },
+    error: {
+      icon: <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />,
+      bgClass: "bg-red-50 dark:bg-red-950/90",
+      borderClass: "border-red-200 dark:border-red-800",
+      textClass: "text-red-900 dark:text-red-100",
+    },
+    info: {
+      icon: <Info className="w-5 h-5 text-blue-600 dark:text-blue-400" />,
+      bgClass: "bg-blue-50 dark:bg-blue-950/90",
+      borderClass: "border-blue-200 dark:border-blue-800",
+      textClass: "text-blue-900 dark:text-blue-100",
+    },
+    warning: {
+      icon: <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />,
+      bgClass: "bg-yellow-50 dark:bg-yellow-950/90",
+      borderClass: "border-yellow-200 dark:border-yellow-800",
+      textClass: "text-yellow-900 dark:text-yellow-100",
+    },
   };
 
-  const styles = {
-    success: "bg-green-500/10 border-green-500/50 text-green-500",
-    error: "bg-red-500/10 border-red-500/50 text-red-500",
-    info: "bg-blue-500/10 border-blue-500/50 text-blue-500",
-    warning: "bg-yellow-500/10 border-yellow-500/50 text-yellow-500",
-  };
+  const { icon, bgClass, borderClass, textClass } = config[type];
 
   return (
     <div
       className={cn(
         "pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-xl shadow-lg animate-in slide-in-from-right-5 duration-300 min-w-[300px] max-w-md",
-        styles[type]
+        bgClass,
+        borderClass
       )}
     >
-      <div className="flex-shrink-0">{icons[type]}</div>
-      <p className="flex-1 text-sm font-medium text-foreground">{message}</p>
+      <div className="flex-shrink-0">{icon}</div>
+      <p className={cn("flex-1 text-sm font-medium", textClass)}>{message}</p>
       <button
         onClick={onClose}
-        className="flex-shrink-0 p-1 hover:bg-background/20 rounded-lg transition-colors"
+        className={cn("flex-shrink-0 p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded-lg transition-colors", textClass)}
         aria-label="Close"
       >
         <X className="w-4 h-4" />
