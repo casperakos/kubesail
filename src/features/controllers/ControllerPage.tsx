@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { useToastStore } from "../../lib/toastStore";
 import {
   Table,
   TableBody,
@@ -616,6 +617,7 @@ function getSensorStatus(resource: CustomResource): { status: string; color: str
 export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageProps) {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
   const controller = useController(controllerId);
+  const addToast = useToastStore((state) => state.addToast);
 
   const [relatedCRDs, setRelatedCRDs] = useState<CRD[]>([]);
   const [loading, setLoading] = useState(true);
@@ -937,8 +939,14 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
     setResourceToDelete(resource);
   }
 
-  async function confirmDeleteResource() {
+  async function confirmDeleteResource(e?: React.MouseEvent) {
+    e?.preventDefault();
+    e?.stopPropagation();
+
     if (!resourceToDelete || !selectedCRD) return;
+
+    const resourceName = resourceToDelete.name;
+    const resourceKind = resourceToDelete.kind;
 
     try {
       await invoke("delete_custom_resource", {
@@ -948,11 +956,13 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
         name: resourceToDelete.name,
         namespace: resourceToDelete.namespace,
       });
+
+      setResourceToDelete(null);
+      addToast(`${resourceKind} "${resourceName}" has been deleted`, "success");
       loadCustomResources(selectedCRD);
-      setResourceToDelete(null);
     } catch (err) {
-      alert(`Failed to delete resource: ${err}`);
       setResourceToDelete(null);
+      addToast(`Failed to delete ${resourceKind}: ${err}`, "error");
     }
   }
 
@@ -1641,10 +1651,10 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
                 {resourceToDelete.namespace && <span> in namespace <span className="font-mono text-foreground">{resourceToDelete.namespace}</span></span>}? This action cannot be undone.
               </p>
               <div className="flex justify-end gap-3">
-                <Button variant="outline" onClick={cancelDeleteResource}>
+                <Button variant="outline" onClick={(e) => { e.preventDefault(); cancelDeleteResource(); }}>
                   Cancel
                 </Button>
-                <Button variant="destructive" onClick={confirmDeleteResource}>
+                <Button variant="destructive" onClick={(e) => confirmDeleteResource(e)}>
                   Delete
                 </Button>
               </div>

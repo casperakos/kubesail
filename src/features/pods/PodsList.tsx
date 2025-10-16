@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { usePods, useDeletePod, useNamespacePodMetrics } from "../../hooks/useKube";
 import { useAppStore, useSettingsStore } from "../../lib/store";
+import { useToastStore } from "../../lib/toastStore";
 import {
   Table,
   TableBody,
@@ -28,6 +29,7 @@ export function PodsList() {
   const metricsEnabled = useSettingsStore((state) => state.metrics.enabled);
   const { data: pods, isLoading, error, refetch } = usePods(currentNamespace);
   const deletePod = useDeletePod();
+  const addToast = useToastStore((state) => state.addToast);
 
   // Fetch pod metrics data for current namespace
   // Convert empty string to undefined for "all namespaces" case
@@ -105,7 +107,17 @@ export function PodsList() {
       console.log("Confirmed deletion, calling mutate");
       const pod = pods?.find(p => p.name === podToDelete);
       if (pod) {
-        deletePod.mutate({ namespace: pod.namespace, podName: podToDelete });
+        deletePod.mutate(
+          { namespace: pod.namespace, podName: podToDelete },
+          {
+            onSuccess: () => {
+              addToast(`Pod "${podToDelete}" has been deleted`, "success");
+            },
+            onError: (error) => {
+              addToast(`Failed to delete pod: ${error}`, "error");
+            },
+          }
+        );
       }
       setPodToDelete(null);
     }
@@ -144,10 +156,38 @@ export function PodsList() {
 
   const confirmBulkDelete = async () => {
     console.log("Confirmed bulk deletion for:", Array.from(selectedPods));
+    const podCount = selectedPods.size;
+    let successCount = 0;
+    let errorCount = 0;
+
     for (const podName of selectedPods) {
       const pod = pods?.find(p => p.name === podName);
       if (pod) {
-        deletePod.mutate({ namespace: pod.namespace, podName });
+        deletePod.mutate(
+          { namespace: pod.namespace, podName },
+          {
+            onSuccess: () => {
+              successCount++;
+              if (successCount + errorCount === podCount) {
+                if (errorCount === 0) {
+                  addToast(`${podCount} pod${podCount > 1 ? 's' : ''} have been deleted`, "success");
+                } else {
+                  addToast(`${successCount} pod${successCount > 1 ? 's' : ''} deleted, ${errorCount} failed`, "warning");
+                }
+              }
+            },
+            onError: () => {
+              errorCount++;
+              if (successCount + errorCount === podCount) {
+                if (successCount === 0) {
+                  addToast(`Failed to delete ${podCount} pod${podCount > 1 ? 's' : ''}`, "error");
+                } else {
+                  addToast(`${successCount} pod${successCount > 1 ? 's' : ''} deleted, ${errorCount} failed`, "warning");
+                }
+              }
+            },
+          }
+        );
       }
     }
     setSelectedPods(new Set());

@@ -1,5 +1,6 @@
 import { useDeployments, useScaleDeployment, useDeleteDeployment, useNamespacePodMetrics, usePods } from "../../hooks/useKube";
 import { useAppStore, useSettingsStore } from "../../lib/store";
+import { useToastStore } from "../../lib/toastStore";
 import {
   Table,
   TableBody,
@@ -29,6 +30,7 @@ export function DeploymentsList() {
   const scaleDeployment = useScaleDeployment();
   const deleteDeployment = useDeleteDeployment();
   const queryClient = useQueryClient();
+  const addToast = useToastStore((state) => state.addToast);
   const [scalingDeployment, setScalingDeployment] = useState<string | null>(null);
   const [restartingDeployment, setRestartingDeployment] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -176,10 +178,20 @@ export function DeploymentsList() {
     if (deploymentToDelete) {
       const deployment = deployments?.find(d => d.name === deploymentToDelete);
       if (deployment) {
-        deleteDeployment.mutate({
-          namespace: deployment.namespace,
-          deploymentName: deploymentToDelete,
-        });
+        deleteDeployment.mutate(
+          {
+            namespace: deployment.namespace,
+            deploymentName: deploymentToDelete,
+          },
+          {
+            onSuccess: () => {
+              addToast(`Deployment "${deploymentToDelete}" has been deleted`, "success");
+            },
+            onError: (error) => {
+              addToast(`Failed to delete deployment: ${error}`, "error");
+            },
+          }
+        );
       }
       setDeploymentToDelete(null);
     }

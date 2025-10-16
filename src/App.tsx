@@ -24,6 +24,7 @@ import { HelmReleasesList } from "./features/helm/HelmReleasesList";
 import { ControllerPage } from "./features/controllers/ControllerPage";
 import { Settings } from "./features/settings/Settings";
 import { useAppStore } from "./lib/store";
+import { ToastContainer } from "./components/Toast";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -125,6 +126,7 @@ function App() {
       <div className="flex h-screen bg-background text-foreground">
         <Sidebar />
         <MainContent />
+        <ToastContainer />
       </div>
     </QueryClientProvider>
   );
