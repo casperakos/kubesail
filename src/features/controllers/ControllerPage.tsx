@@ -646,11 +646,16 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
   const [syncingResources, setSyncingResources] = useState<Set<string>>(new Set());
   const [hardRefreshingResources, setHardRefreshingResources] = useState<Set<string>>(new Set());
 
+  // For delete confirmation
+  const [resourceToDelete, setResourceToDelete] = useState<CustomResource | null>(null);
+
   // ESC key handler to close modals
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        if (detailsResource) {
+        if (resourceToDelete) {
+          setResourceToDelete(null);
+        } else if (detailsResource) {
           setDetailsResource(null);
           setWorkflowViewMode("details");
         } else if (describeResource) {
@@ -663,7 +668,7 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
 
     window.addEventListener("keydown", handleEscKey);
     return () => window.removeEventListener("keydown", handleEscKey);
-  }, [detailsResource, describeResource, yamlResource]);
+  }, [resourceToDelete, detailsResource, describeResource, yamlResource]);
 
   useEffect(() => {
     if (controller) {
@@ -928,25 +933,31 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
     }
   }
 
-  async function handleDeleteResource(resource: CustomResource) {
-    if (!selectedCRD) return;
+  function handleDeleteResource(resource: CustomResource) {
+    setResourceToDelete(resource);
+  }
 
-    if (!confirm(`Are you sure you want to delete ${resource.kind} "${resource.name}"?`)) {
-      return;
-    }
+  async function confirmDeleteResource() {
+    if (!resourceToDelete || !selectedCRD) return;
 
     try {
       await invoke("delete_custom_resource", {
         group: selectedCRD.group,
         version: selectedCRD.version,
         plural: selectedCRD.plural,
-        name: resource.name,
-        namespace: resource.namespace,
+        name: resourceToDelete.name,
+        namespace: resourceToDelete.namespace,
       });
       loadCustomResources(selectedCRD);
+      setResourceToDelete(null);
     } catch (err) {
       alert(`Failed to delete resource: ${err}`);
+      setResourceToDelete(null);
     }
+  }
+
+  function cancelDeleteResource() {
+    setResourceToDelete(null);
   }
 
   function handleBack() {
@@ -1518,11 +1529,7 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
                               <FileText className="w-4 h-4" />
                             </Button>
                             <Button
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleDeleteResource(resource);
-                              }}
+                              onClick={() => handleDeleteResource(resource)}
                               variant="ghost"
                               size="sm"
                               className="text-destructive hover:text-destructive"
@@ -1622,6 +1629,27 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
             namespace={yamlResource.namespace || undefined}
             onClose={() => setYamlResource(null)}
           />
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {resourceToDelete && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 shadow-xl">
+              <h3 className="text-lg font-semibold mb-2 text-foreground">Confirm Deletion</h3>
+              <p className="text-muted-foreground mb-6">
+                Are you sure you want to delete {resourceToDelete.kind} <span className="font-mono text-foreground">"{resourceToDelete.name}"</span>
+                {resourceToDelete.namespace && <span> in namespace <span className="font-mono text-foreground">{resourceToDelete.namespace}</span></span>}? This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={cancelDeleteResource}>
+                  Cancel
+                </Button>
+                <Button variant="destructive" onClick={confirmDeleteResource}>
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Details Modal for ArgoCD Apps and ApplicationSets */}
