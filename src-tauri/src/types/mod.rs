@@ -345,3 +345,20 @@ pub struct CustomResourceInfo {
     pub age: String,
     pub metadata: serde_json::Value,
 }
+
+// CloudNativePG Types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CNPGConnectionDetails {
+    pub cluster_name: String,
+    pub namespace: String,
+    pub database: String,
+    pub username: String,
+    pub password: String,
+    pub host: String,
+    pub port: String,
+    pub uri: String,
+    pub fqdn_uri: String,
+    pub jdbc_uri: String,
+    pub fqdn_jdbc_uri: String,
+    pub pgpass: String,
+}

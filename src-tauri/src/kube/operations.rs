@@ -18,7 +18,7 @@ use crate::types::{
     StatefulSetInfo, DaemonSetInfo, JobInfo, CronJobInfo, NodeInfo, EventInfo,
     PersistentVolumeInfo, PersistentVolumeClaimInfo, RoleInfo, RoleBindingInfo,
     ClusterRoleInfo, ClusterRoleBindingInfo, ServiceAccountInfo, SubjectInfo,
-    CRDInfo, CustomResourceInfo,
+    CRDInfo, CustomResourceInfo, CNPGConnectionDetails,
 };
 
 pub async fn list_namespaces(client: Client) -> Result<Vec<NamespaceInfo>> {
@@ -2881,4 +2881,161 @@ pub async fn delete_custom_resource(
 
     api.delete(name, &DeleteParams::default()).await?;
     Ok(())
+}
+
+// CloudNativePG cluster connection details
+pub async fn get_cnpg_cluster_connection(
+    client: Client,
+    cluster_name: &str,
+    namespace: &str,
+) -> Result<CNPGConnectionDetails> {
+    use serde_json::Value;
+
+    tracing::info!(
+        "Fetching CNPG cluster connection details for cluster: {}, namespace: {}",
+        cluster_name,
+        namespace
+    );
+
+    // Get the Cluster resource to extract database name and other config
+    let clusters: Api<DynamicObject> = Api::namespaced_with(
+        client.clone(),
+        namespace,
+        &ApiResource {
+            group: "postgresql.cnpg.io".to_string(),
+            version: "v1".to_string(),
+            api_version: "postgresql.cnpg.io/v1".to_string(),
+            kind: "Cluster".to_string(),
+            plural: "clusters".to_string(),
+        },
+    );
+
+    tracing::debug!("Attempting to fetch Cluster resource: {}", cluster_name);
+    let cluster = clusters.get(cluster_name).await.map_err(|e| {
+        tracing::error!("Failed to fetch Cluster resource: {}", e);
+        e
+    })?;
+    tracing::info!("Successfully fetched Cluster resource");
+
+    let cluster_data: Value = serde_json::to_value(&cluster.data)?;
+    tracing::debug!("Cluster data: {}", serde_json::to_string_pretty(&cluster_data).unwrap_or_else(|_| "Unable to serialize".to_string()));
+
+    // Extract database configuration from cluster spec
+    let database = cluster_data["spec"]["bootstrap"]["initdb"]["database"]
+        .as_str()
+        .unwrap_or("app")
+        .to_string();
+
+    let username = cluster_data["spec"]["bootstrap"]["initdb"]["owner"]
+        .as_str()
+        .unwrap_or("app")
+        .to_string();
+
+    let secret_name = cluster_data["spec"]["bootstrap"]["initdb"]["secret"]["name"]
+        .as_str()
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| format!("{}-appuser", cluster_name));
+
+    tracing::info!(
+        "Extracted from cluster spec - database: {}, username: {}, secret_name: {}",
+        database,
+        username,
+        secret_name
+    );
+
+    // Get the secret containing the password
+    let secrets: Api<Secret> = Api::namespaced(client, namespace);
+    tracing::debug!("Attempting to fetch secret: {}", secret_name);
+    let secret = secrets.get(&secret_name).await.map_err(|e| {
+        tracing::error!("Failed to fetch secret '{}': {}", secret_name, e);
+        e
+    })?;
+    tracing::info!("Successfully fetched secret: {}", secret_name);
+
+    // Log secret data keys
+    if let Some(data) = &secret.data {
+        let keys: Vec<_> = data.keys().collect();
+        tracing::info!("Secret contains keys: {:?}", keys);
+    } else {
+        tracing::warn!("Secret has no data field!");
+    }
+
+    // Helper function to extract secret data
+    // Note: kube-rs automatically base64-decodes the secret data,
+    // so we just need to convert ByteString to String
+    let decode_secret_data = |key: &str| -> Result<String> {
+        let data = secret.data.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Secret has no data field"))?;
+
+        let bytes = data.get(key)
+            .ok_or_else(|| anyhow::anyhow!("Secret key '{}' not found", key))?;
+
+        tracing::debug!("Raw ByteString for key '{}' has {} bytes", key, bytes.0.len());
+
+        // ByteString is already decoded by kube-rs - just convert to UTF-8 string
+        String::from_utf8(bytes.0.clone())
+            .map_err(|e| anyhow::anyhow!("UTF8 conversion failed for key '{}': {}", key, e))
+    };
+
+    tracing::debug!("Attempting to decode password from secret");
+    let password = decode_secret_data("password").map_err(|e| {
+        tracing::error!("Failed to decode password: {}", e);
+        e
+    })?;
+    tracing::info!("Successfully decoded password");
+
+    // CloudNativePG standard service names
+    let host = format!("{}-rw", cluster_name); // Read-write service
+    let port = "5432".to_string();
+    let fqdn_host = format!("{}-rw.{}.svc.cluster.local", cluster_name, namespace);
+
+    tracing::info!(
+        "Constructing connection strings - host: {}, port: {}, fqdn_host: {}",
+        host,
+        port,
+        fqdn_host
+    );
+
+    // Construct connection strings
+    let uri = format!(
+        "postgresql://{}:{}@{}:{}/{}",
+        username, password, host, port, database
+    );
+
+    let fqdn_uri = format!(
+        "postgresql://{}:{}@{}:{}/{}",
+        username, password, fqdn_host, port, database
+    );
+
+    let jdbc_uri = format!(
+        "jdbc:postgresql://{}:{}/{}",
+        host, port, database
+    );
+
+    let fqdn_jdbc_uri = format!(
+        "jdbc:postgresql://{}:{}/{}",
+        fqdn_host, port, database
+    );
+
+    let pgpass = format!(
+        "{}:{}:{}:{}:{}",
+        host, port, database, username, password
+    );
+
+    tracing::info!("Successfully built CNPG connection details");
+
+    Ok(CNPGConnectionDetails {
+        cluster_name: cluster_name.to_string(),
+        namespace: namespace.to_string(),
+        database,
+        username,
+        password,
+        host,
+        port,
+        uri,
+        fqdn_uri,
+        jdbc_uri,
+        fqdn_jdbc_uri,
+        pgpass,
+    })
 }

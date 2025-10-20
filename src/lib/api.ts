@@ -27,6 +27,7 @@ import type {
   HelmReleaseDetail,
   MetricsCapabilities,
   ClusterMetricsData,
+  CNPGConnectionDetails,
 } from "../types";
 
 export const api = {
@@ -507,5 +508,10 @@ export const api = {
 
   async getNamespacePodMetrics(namespace?: string): Promise<PodMetrics[]> {
     return await invoke("get_namespace_pod_metrics", { namespace });
+  },
+
+  // CloudNativePG operations
+  async getCNPGClusterConnection(clusterName: string, namespace: string): Promise<CNPGConnectionDetails> {
+    return await invoke("get_cnpg_cluster_connection", { clusterName, namespace });
   },
 };

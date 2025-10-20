@@ -133,6 +133,8 @@ const getControllerIcon = (controllerId: string) => {
       return Workflow;
     case "argo-events":
       return Zap;
+    case "cloudnativepg":
+      return Database;
     default:
       return Database;
   }

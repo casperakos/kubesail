@@ -475,3 +475,19 @@ export interface SettingsState extends UserSettings {
   updateAdvancedSetting: (key: keyof UserSettings['advanced'], value: any) => void;
   resetToDefaults: () => void;
 }
+
+// CloudNativePG Types
+export interface CNPGConnectionDetails {
+  cluster_name: string;
+  namespace: string;
+  database: string;
+  username: string;
+  password: string;
+  host: string;
+  port: string;
+  uri: string;
+  fqdn_uri: string;
+  jdbc_uri: string;
+  fqdn_jdbc_uri: string;
+  pgpass: string;
+}

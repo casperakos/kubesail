@@ -46,6 +46,7 @@ import { CustomResourceDescribeViewer } from "../../components/CustomResourceDes
 import { CustomResourceYamlViewer } from "../../components/CustomResourceYamlViewer";
 import { WorkflowDAGViewer } from "../../components/WorkflowDAGViewer";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
+import { ClusterConnectionDetails } from "../cloudnativepg/ClusterConnectionDetails";
 
 interface CRD {
   name: string;
@@ -136,6 +137,16 @@ function getResourceStatus(resource: CustomResource): { status: string; color: s
   // Special handling for Sensors
   if (kind === "Sensor") {
     return getSensorStatus(resource);
+  }
+
+  // Special handling for CloudNativePG Clusters
+  if (kind === "Cluster" && resource.api_version.includes("postgresql.cnpg.io")) {
+    return getCNPGClusterStatus(resource);
+  }
+
+  // Special handling for CloudNativePG Backups
+  if (kind === "Backup" && resource.api_version.includes("postgresql.cnpg.io")) {
+    return getCNPGBackupStatus(resource);
   }
 
   // Check for common status patterns
@@ -614,6 +625,89 @@ function getSensorStatus(resource: CustomResource): { status: string; color: str
   }
 
   return { status: "Unknown", color: "text-gray-600" };
+}
+
+// Helper function to get CloudNativePG Cluster status
+function getCNPGClusterStatus(resource: CustomResource): { status: string; color: string } {
+  const status = resource.metadata?.status;
+
+  if (!status) {
+    return { status: "Unknown", color: "text-gray-600" };
+  }
+
+  // Check phase first
+  const phase = status.phase;
+  if (phase) {
+    const phaseLower = phase.toLowerCase();
+
+    // Healthy states
+    if (phaseLower.includes("healthy") || phaseLower === "cluster in healthy state") {
+      return { status: "Healthy", color: "text-green-600" };
+    }
+
+    // Initializing/Setup states
+    if (phaseLower.includes("setting up") || phaseLower.includes("initializing") || phaseLower.includes("waiting for")) {
+      return { status: "Initializing", color: "text-blue-600" };
+    }
+
+    // Upgrading states
+    if (phaseLower.includes("upgrade")) {
+      return { status: "Upgrading", color: "text-yellow-600" };
+    }
+
+    // Failed/Error states
+    if (phaseLower.includes("failed") || phaseLower.includes("error")) {
+      return { status: "Failed", color: "text-red-600" };
+    }
+  }
+
+  // Check conditions
+  const conditions = status.conditions;
+  if (conditions && Array.isArray(conditions)) {
+    const readyCondition = conditions.find((c: any) => c.type === "Ready");
+    if (readyCondition) {
+      if (readyCondition.status === "True") {
+        return { status: "Ready", color: "text-green-600" };
+      } else {
+        // Check reason for more specific status
+        if (readyCondition.reason === "ClusterIsNotReady") {
+          return { status: "Not Ready", color: "text-yellow-600" };
+        }
+        return { status: readyCondition.reason || "Not Ready", color: "text-yellow-600" };
+      }
+    }
+  }
+
+  return { status: phase || "Unknown", color: "text-gray-600" };
+}
+
+// Helper function to get CloudNativePG Backup status
+function getCNPGBackupStatus(resource: CustomResource): { status: string; color: string } {
+  const status = resource.metadata?.status;
+
+  if (!status) {
+    return { status: "Unknown", color: "text-gray-600" };
+  }
+
+  const phase = status.phase;
+  if (phase) {
+    const phaseLower = phase.toLowerCase();
+
+    if (phaseLower === "completed") {
+      return { status: "Completed", color: "text-green-600" };
+    }
+    if (phaseLower === "running") {
+      return { status: "Running", color: "text-blue-600" };
+    }
+    if (phaseLower === "failed") {
+      return { status: "Failed", color: "text-red-600" };
+    }
+    if (phaseLower === "pending") {
+      return { status: "Pending", color: "text-yellow-600" };
+    }
+  }
+
+  return { status: phase || "Unknown", color: "text-gray-600" };
 }
 
 export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageProps) {
@@ -1239,6 +1333,10 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
                     const pipelineData = isWorkflow ? getPipelineExecutionData(resource) : [];
                     const hasPipelineData = pipelineData.length > 0;
 
+                    // Check if this is a CNPG Cluster
+                    const isCNPGCluster = resource.kind === "Cluster" && resource.api_version.includes("postgresql.cnpg.io");
+                    const canExpand = hasPipelineData || isCNPGCluster;
+
                     // Build context menu items
                     const menuItems: ContextMenuItem[] = [
                       // View Details (for ArgoCD, Argo Workflows, Argo Events)
@@ -1305,7 +1403,7 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
                           <TableRow>
                           <TableCell className="font-mono text-sm">
                             <div className="flex items-center gap-2">
-                              {isWorkflow && hasPipelineData && (
+                              {canExpand && (
                                 <button
                                   onClick={() => {
                                     const newExpanded = new Set(expandedRows);
@@ -1589,6 +1687,18 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
                                 </div>
                               ))}
                             </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+
+                      {/* Expanded Row for CNPG Connection Details */}
+                      {isExpanded && isCNPGCluster && (
+                        <TableRow key={`${rowId}-cnpg-expanded`} className="bg-muted/30">
+                          <TableCell colSpan={selectedCRD.scope === "Namespaced" ? 10 : 9} className="p-4">
+                            <ClusterConnectionDetails
+                              clusterName={resource.name}
+                              namespace={resource.namespace || ""}
+                            />
                           </TableCell>
                         </TableRow>
                       )}

@@ -22,6 +22,7 @@ import { PortForwardsPage } from "./features/portforwards/PortForwardsPage";
 import { CRDsList } from "./features/crds/CRDsList";
 import { HelmReleasesList } from "./features/helm/HelmReleasesList";
 import { ControllerPage } from "./features/controllers/ControllerPage";
+import { CloudNativePGPage } from "./features/cloudnativepg/CloudNativePGPage";
 import { Settings } from "./features/settings/Settings";
 import { NamespacesList } from "./features/namespaces/NamespacesList";
 import { useAppStore } from "./lib/store";
@@ -110,6 +111,7 @@ function MainContent() {
         {currentView === "argo-workflows" && <ControllerPage controllerId="argo-workflows" />}
         {currentView === "argo-workflows-workflows" && <ControllerPage controllerId="argo-workflows" defaultCRDKind="Workflow" />}
         {currentView === "argo-events" && <ControllerPage controllerId="argo-events" />}
+        {currentView === "cloudnativepg" && <CloudNativePGPage />}
         {currentView === "settings" && <Settings />}
         {currentView === "namespaces" && <NamespacesList />}
       </main>

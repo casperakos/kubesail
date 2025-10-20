@@ -8,7 +8,7 @@ export interface ControllerInfo {
   detected: boolean;
   crdPatterns: string[];
   description: string;
-  category: "gitops" | "secrets" | "certificates" | "infrastructure" | "workflows";
+  category: "gitops" | "secrets" | "certificates" | "infrastructure" | "workflows" | "databases";
 }
 
 const KNOWN_CONTROLLERS: Omit<ControllerInfo, "detected">[] = [
@@ -75,6 +75,14 @@ const KNOWN_CONTROLLERS: Omit<ControllerInfo, "detected">[] = [
     crdPatterns: ["eventsources.argoproj.io", "sensors.argoproj.io"],
     description: "Event-driven workflow automation",
     category: "workflows",
+  },
+  {
+    id: "cloudnativepg",
+    name: "CloudNativePG",
+    icon: "Database",
+    crdPatterns: ["clusters.postgresql.cnpg.io", "backups.postgresql.cnpg.io", "scheduledbackups.postgresql.cnpg.io", "poolers.postgresql.cnpg.io"],
+    description: "PostgreSQL operator for Kubernetes",
+    category: "databases",
   },
 ];
 

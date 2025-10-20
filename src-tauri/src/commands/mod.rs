@@ -1221,3 +1221,21 @@ pub async fn get_namespace_pod_metrics(
         .await
         .map_err(|e| e.to_string())
 }
+
+// ==================== CloudNativePG Commands ====================
+
+#[tauri::command]
+pub async fn get_cnpg_cluster_connection(
+    client_manager: State<'_, KubeClientManager>,
+    cluster_name: String,
+    namespace: String,
+) -> Result<crate::types::CNPGConnectionDetails, String> {
+    let client = client_manager
+        .get_client()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    crate::kube::get_cnpg_cluster_connection(client, &cluster_name, &namespace)
+        .await
+        .map_err(|e| e.to_string())
+}

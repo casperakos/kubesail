@@ -2298,6 +2298,7 @@ name = "kubesail"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "chrono",
  "futures",
  "k8s-openapi",

@@ -159,6 +159,7 @@ pub fn run() {
             commands::detect_metrics_capabilities,
             commands::get_cluster_metrics_data,
             commands::get_namespace_pod_metrics,
+            commands::get_cnpg_cluster_connection,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
