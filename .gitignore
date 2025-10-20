@@ -11,7 +11,7 @@ src-tauri/target/
 *.log
 npm-debug.log*
 pnpm-debug.log*
-logs/
+/logs/
 
 # Editor directories
 .DS_Store
