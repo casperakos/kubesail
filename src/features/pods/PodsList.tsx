@@ -122,14 +122,28 @@ const PodRow = memo(({
   return (
     <ContextMenuTrigger items={menuItems}>
       <TableRow>
-        <TableCell>
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={() => onToggleSelection(pod.name)}
-            className="w-4 h-4 cursor-pointer"
-            onClick={(e) => e.stopPropagation()}
-          />
+        <TableCell
+          className="cursor-pointer hover:bg-accent/50 transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelection(pod.name);
+          }}
+        >
+          <div className="flex items-center justify-center pointer-events-none">
+            <div className="relative flex items-center justify-center">
+              <div
+                className={`w-5 h-5 rounded border-2 transition-all duration-200 ${
+                  isSelected
+                    ? 'bg-primary border-primary'
+                    : 'bg-background border-border hover:border-primary/50'
+                } flex items-center justify-center`}
+              >
+                {isSelected && (
+                  <span className="text-primary-foreground text-xs">✓</span>
+                )}
+              </div>
+            </div>
+          </div>
         </TableCell>
         <TableCell className="font-medium">{pod.name}</TableCell>
         {showNamespaceColumn && <TableCell>{pod.namespace}</TableCell>}
@@ -280,6 +294,45 @@ export function PodsList() {
     setSelectedPodForShell(pod);
   }, []);
 
+  // Filter pods based on search query with smart matching
+  const filteredPods = useMemo(() => {
+    if (!pods) return [];
+    if (!searchQuery) return pods;
+
+    const query = searchQuery.toLowerCase().trim();
+
+    // If query is very short (1-2 chars), only match name and status to avoid false positives
+    if (query.length <= 2) {
+      return pods.filter(pod =>
+        pod.name.toLowerCase().includes(query) ||
+        pod.status.toLowerCase().includes(query)
+      );
+    }
+
+    // For longer queries, use smart matching
+    return pods.filter(pod => {
+      const name = pod.name.toLowerCase();
+      const status = pod.status.toLowerCase();
+      const node = pod.node?.toLowerCase() || '';
+      const ip = pod.ip?.toLowerCase() || '';
+
+      // Prioritize name matches (most common search target)
+      if (name.includes(query)) return true;
+
+      // Status matches
+      if (status.includes(query)) return true;
+
+      // For node and IP, require longer matches (4+ chars) to avoid false positives
+      // This prevents "68" from matching "192.168.x.x"
+      if (query.length >= 4) {
+        if (node.includes(query)) return true;
+        if (ip.includes(query)) return true;
+      }
+
+      return false;
+    });
+  }, [pods, searchQuery]);
+
   const handleDelete = (podName: string) => {
     console.log("Delete button clicked for pod:", podName);
     setPodToDelete(podName);
@@ -311,13 +364,6 @@ export function PodsList() {
     setPodToDelete(null);
   };
 
-  const toggleSelectAll = () => {
-    if (selectedPods.size === filteredPods.length && filteredPods.length > 0) {
-      setSelectedPods(new Set());
-    } else {
-      setSelectedPods(new Set(filteredPods.map(pod => pod.name)));
-    }
-  };
 
   const handleBulkDelete = () => {
     if (selectedPods.size > 0) {
@@ -361,45 +407,6 @@ export function PodsList() {
   const cancelBulkDelete = () => {
     setShowBulkDeleteConfirm(false);
   };
-
-  // Filter pods based on search query with smart matching
-  const filteredPods = useMemo(() => {
-    if (!pods) return [];
-    if (!searchQuery) return pods;
-
-    const query = searchQuery.toLowerCase().trim();
-
-    // If query is very short (1-2 chars), only match name and status to avoid false positives
-    if (query.length <= 2) {
-      return pods.filter(pod =>
-        pod.name.toLowerCase().includes(query) ||
-        pod.status.toLowerCase().includes(query)
-      );
-    }
-
-    // For longer queries, use smart matching
-    return pods.filter(pod => {
-      const name = pod.name.toLowerCase();
-      const status = pod.status.toLowerCase();
-      const node = pod.node?.toLowerCase() || '';
-      const ip = pod.ip?.toLowerCase() || '';
-
-      // Prioritize name matches (most common search target)
-      if (name.includes(query)) return true;
-
-      // Status matches
-      if (status.includes(query)) return true;
-
-      // For node and IP, require longer matches (4+ chars) to avoid false positives
-      // This prevents "68" from matching "192.168.x.x"
-      if (query.length >= 4) {
-        if (node.includes(query)) return true;
-        if (ip.includes(query)) return true;
-      }
-
-      return false;
-    });
-  }, [pods, searchQuery]);
 
   // Clear selections when namespace changes
   useEffect(() => {
@@ -520,16 +527,7 @@ export function PodsList() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-12">
-              <div className="flex items-center justify-center">
-                <input
-                  type="checkbox"
-                  checked={selectedPods.size === filteredPods.length && filteredPods.length > 0}
-                  onChange={toggleSelectAll}
-                  className="w-4 h-4 cursor-pointer"
-                />
-              </div>
-            </TableHead>
+            <TableHead className="w-12"></TableHead>
             <TableHead>Name</TableHead>
             {showNamespaceColumn && <TableHead>Namespace</TableHead>}
             <TableHead>Status</TableHead>
