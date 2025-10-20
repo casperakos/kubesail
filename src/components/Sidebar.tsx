@@ -213,16 +213,14 @@ export function Sidebar() {
     items: quickAccessItems,
   } : null;
 
-  // Build dynamic controller section (excluding argo-workflows and argocd since they're in Quick Access)
+  // Build dynamic controller section with ALL controllers
   const controllerSection = controllers && controllers.length > 0 ? {
     title: "Controllers",
-    items: controllers
-      .filter(c => c.id !== 'argo-workflows' && c.id !== 'argocd') // Exclude these from Controllers section
-      .map((controller) => ({
-        icon: getControllerIcon(controller.id),
-        label: controller.name,
-        view: controller.id as ResourceType,
-      })),
+    items: controllers.map((controller) => ({
+      icon: getControllerIcon(controller.id),
+      label: controller.name,
+      view: controller.id as ResourceType,
+    })),
   } : null;
 
   // Filter out sections and build final list

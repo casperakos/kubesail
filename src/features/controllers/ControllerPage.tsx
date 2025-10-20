@@ -1113,9 +1113,11 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
           <p className="text-destructive">Error loading resources: {resourcesError}</p>
           <div className="flex gap-2">
             <Button onClick={() => loadCustomResources(selectedCRD)}>Retry</Button>
-            <Button onClick={handleBack} variant="outline">
-              Back to {controller.name}
-            </Button>
+            {!defaultCRDKind && (
+              <Button onClick={handleBack} variant="outline">
+                Back to {controller.name}
+              </Button>
+            )}
           </div>
         </div>
       );
@@ -1125,9 +1127,11 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
       <div className="flex flex-col h-full">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Button onClick={handleBack} variant="ghost" size="sm">
-              ← Back
-            </Button>
+            {!defaultCRDKind && (
+              <Button onClick={handleBack} variant="ghost" size="sm">
+                ← Back
+              </Button>
+            )}
             <div>
               <h2 className="text-2xl font-bold">{selectedCRD.kind}</h2>
               <p className="text-sm text-muted-foreground mt-1">
