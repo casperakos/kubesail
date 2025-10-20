@@ -1225,7 +1225,7 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
                   <TableRow>
                     <TableHead>Name</TableHead>
                     {selectedCRD.scope === "Namespaced" && <TableHead>Namespace</TableHead>}
-                    <TableHead>Status</TableHead>
+                    {!(controllerId === "argo-workflows" && selectedCRD.kind === "Workflow") && <TableHead>Status</TableHead>}
                     {controllerId === "argocd" && selectedCRD.kind === "Application" && (
                       <>
                         <TableHead>Sync</TableHead>
@@ -1247,10 +1247,11 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
                     {controllerId === "argo-workflows" && selectedCRD.kind === "Workflow" && (
                       <>
                         <TableHead>Phase</TableHead>
+                        <TableHead>Template</TableHead>
                         <TableHead>Pipeline</TableHead>
                         <TableHead>Progress</TableHead>
                         <TableHead>Duration</TableHead>
-                        <TableHead>Started</TableHead>
+                        <TableHead>Finished</TableHead>
                       </>
                     )}
                     {controllerId === "argo-workflows" && selectedCRD.kind === "WorkflowTemplate" && (
@@ -1316,10 +1317,11 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
                     const isWorkflowTemplate = resource.kind === "WorkflowTemplate";
                     const isCronWorkflow = resource.kind === "CronWorkflow";
                     const workflowPhase = isWorkflow ? getWorkflowPhase(resource) : null;
+                    const workflowTemplate = isWorkflow ? (resource.spec?.workflowTemplateRef?.name || resource.spec?.workflowSpec?.templateRef?.name || "-") : null;
                     const workflowPipelineNames = isWorkflow ? getWorkflowPipelineNames(resource) : [];
                     const workflowProgress = isWorkflow ? getWorkflowProgress(resource) : null;
                     const workflowDuration = isWorkflow ? getWorkflowDuration(resource) : null;
-                    const workflowStarted = isWorkflow ? getWorkflowStartTime(resource) : null;
+                    const workflowFinished = isWorkflow ? (resource.metadata?.status?.finishedAt ? new Date(resource.metadata.status.finishedAt).toLocaleString() : "-") : null;
                     const templateEntrypoint = isWorkflowTemplate ? getWorkflowTemplateEntryPoint(resource) : null;
                     const templateCount = isWorkflowTemplate ? getWorkflowTemplateCount(resource) : null;
                     const cronSchedule = isCronWorkflow ? getCronSchedule(resource) : null;
@@ -1445,9 +1447,11 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
                         {selectedCRD.scope === "Namespaced" && (
                           <TableCell>{resource.namespace || "-"}</TableCell>
                         )}
-                        <TableCell>
-                          <span className={`font-medium ${color}`}>{status}</span>
-                        </TableCell>
+                        {!isWorkflow && (
+                          <TableCell>
+                            <span className={`font-medium ${color}`}>{status}</span>
+                          </TableCell>
+                        )}
                         {controllerId === "argocd" && isApplication && (
                           <>
                             <TableCell>
@@ -1569,6 +1573,9 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
                               </Badge>
                             </TableCell>
                             <TableCell>
+                              <span className="text-xs font-mono text-muted-foreground">{workflowTemplate}</span>
+                            </TableCell>
+                            <TableCell>
                               {workflowPipelineNames.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
                                   {workflowPipelineNames.map((name, idx) => (
@@ -1588,7 +1595,7 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
                               <span className="text-xs">{workflowDuration}</span>
                             </TableCell>
                             <TableCell>
-                              <span className="text-xs text-muted-foreground">{workflowStarted}</span>
+                              <span className="text-xs text-muted-foreground">{workflowFinished}</span>
                             </TableCell>
                           </>
                         )}
