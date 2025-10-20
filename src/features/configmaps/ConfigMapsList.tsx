@@ -173,7 +173,7 @@ export function ConfigMapsList() {
               ];
 
               return (
-                <ContextMenuTrigger key={cm.name} items={menuItems}>
+                <ContextMenuTrigger key={`${cm.namespace}/${cm.name}`} items={menuItems}>
                   <TableRow>
                     <TableCell className="font-medium">{cm.name}</TableCell>
                     {showNamespaceColumn && <TableCell>{cm.namespace}</TableCell>}

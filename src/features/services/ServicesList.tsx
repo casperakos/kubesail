@@ -297,7 +297,7 @@ export function ServicesList() {
 
               return [
                 // Main service row
-                <ContextMenuTrigger key={service.name} items={menuItems}>
+                <ContextMenuTrigger key={`${service.namespace}/${service.name}`} items={menuItems}>
                   <TableRow>
                     <TableCell>
                       {matchedPods.length > 0 && (

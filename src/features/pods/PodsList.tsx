@@ -120,7 +120,7 @@ const PodRow = memo(({
   ], [pod, onPortForward, onViewYaml, onDescribe, onViewLogs, onShell, onDelete, isDeleting]);
 
   return (
-    <ContextMenuTrigger key={pod.name} items={menuItems}>
+    <ContextMenuTrigger items={menuItems}>
       <TableRow>
         <TableCell>
           <input
@@ -362,18 +362,43 @@ export function PodsList() {
     setShowBulkDeleteConfirm(false);
   };
 
-  // Filter pods based on search query
+  // Filter pods based on search query with smart matching
   const filteredPods = useMemo(() => {
     if (!pods) return [];
     if (!searchQuery) return pods;
 
-    const query = searchQuery.toLowerCase();
-    return pods.filter(pod =>
-      pod.name.toLowerCase().includes(query) ||
-      pod.status.toLowerCase().includes(query) ||
-      pod.node?.toLowerCase().includes(query) ||
-      pod.ip?.toLowerCase().includes(query)
-    );
+    const query = searchQuery.toLowerCase().trim();
+
+    // If query is very short (1-2 chars), only match name and status to avoid false positives
+    if (query.length <= 2) {
+      return pods.filter(pod =>
+        pod.name.toLowerCase().includes(query) ||
+        pod.status.toLowerCase().includes(query)
+      );
+    }
+
+    // For longer queries, use smart matching
+    return pods.filter(pod => {
+      const name = pod.name.toLowerCase();
+      const status = pod.status.toLowerCase();
+      const node = pod.node?.toLowerCase() || '';
+      const ip = pod.ip?.toLowerCase() || '';
+
+      // Prioritize name matches (most common search target)
+      if (name.includes(query)) return true;
+
+      // Status matches
+      if (status.includes(query)) return true;
+
+      // For node and IP, require longer matches (4+ chars) to avoid false positives
+      // This prevents "68" from matching "192.168.x.x"
+      if (query.length >= 4) {
+        if (node.includes(query)) return true;
+        if (ip.includes(query)) return true;
+      }
+
+      return false;
+    });
   }, [pods, searchQuery]);
 
   // Clear selections when namespace changes
@@ -535,7 +560,7 @@ export function PodsList() {
           ) : (
             filteredPods.map((pod) => (
               <PodRow
-                key={pod.name}
+                key={`${pod.namespace}/${pod.name}`}
                 pod={pod}
                 metrics={getPodMetrics(pod.name, pod.namespace)}
                 showNamespaceColumn={showNamespaceColumn}

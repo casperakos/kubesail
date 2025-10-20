@@ -518,7 +518,7 @@ function StatefulSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: 
             ];
 
             return (
-            <ContextMenuTrigger key={sts.name} items={menuItems}>
+            <ContextMenuTrigger key={`${sts.namespace}/${sts.name}`} items={menuItems}>
               <TableRow>
                 <TableCell className="font-medium">{sts.name}</TableCell>
                 {showNamespaceColumn && <TableCell>{sts.namespace}</TableCell>}
@@ -943,7 +943,7 @@ function DaemonSetsTable({ data, isLoading, error, searchQuery, onViewYaml }: an
             ];
 
             return (
-            <ContextMenuTrigger key={ds.name} items={menuItems}>
+            <ContextMenuTrigger key={`${ds.namespace}/${ds.name}`} items={menuItems}>
               <TableRow>
                 <TableCell className="font-medium">{ds.name}</TableCell>
                 {showNamespaceColumn && <TableCell>{ds.namespace}</TableCell>}
@@ -1221,7 +1221,7 @@ function JobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any) {
               ];
 
               return (
-                <ContextMenuTrigger key={job.name} items={menuItems}>
+                <ContextMenuTrigger key={`${job.namespace}/${job.name}`} items={menuItems}>
                   <TableRow>
                     <TableCell className="font-medium">{job.name}</TableCell>
                     {showNamespaceColumn && <TableCell>{job.namespace}</TableCell>}
@@ -1486,7 +1486,7 @@ function CronJobsTable({ data, isLoading, error, searchQuery, onViewYaml }: any)
               ];
 
               return (
-                <ContextMenuTrigger key={cj.name} items={menuItems}>
+                <ContextMenuTrigger key={`${cj.namespace}/${cj.name}`} items={menuItems}>
                   <TableRow>
                     <TableCell className="font-medium">{cj.name}</TableCell>
                     {showNamespaceColumn && <TableCell>{cj.namespace}</TableCell>}

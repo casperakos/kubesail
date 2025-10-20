@@ -399,7 +399,7 @@ export function DeploymentsList() {
             ];
 
             return (
-              <ContextMenuTrigger key={deployment.name} items={menuItems}>
+              <ContextMenuTrigger key={`${deployment.namespace}/${deployment.name}`} items={menuItems}>
                 <TableRow>
                   <TableCell className="font-medium">{deployment.name}</TableCell>
                   {showNamespaceColumn && <TableCell>{deployment.namespace}</TableCell>}

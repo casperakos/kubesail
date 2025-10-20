@@ -334,7 +334,7 @@ function PersistentVolumeClaimsTable({ data, isLoading, error, searchQuery, onVi
             ];
 
             return (
-              <ContextMenuTrigger key={pvc.name} items={menuItems}>
+              <ContextMenuTrigger key={`${pvc.namespace}/${pvc.name}`} items={menuItems}>
                 <TableRow>
                   <TableCell className="font-medium">{pvc.name}</TableCell>
                   {showNamespaceColumn && <TableCell>{pvc.namespace}</TableCell>}

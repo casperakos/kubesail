@@ -196,7 +196,7 @@ export function IngressesList() {
 
               return [
                 // Main ingress row
-                <ContextMenuTrigger key={ingress.name} items={menuItems}>
+                <ContextMenuTrigger key={`${ingress.namespace}/${ingress.name}`} items={menuItems}>
                   <TableRow>
                     <TableCell>
                       {hasRules && (

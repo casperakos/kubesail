@@ -227,7 +227,7 @@ export function IstioResourcesList() {
 
                 return [
                   // Main VirtualService row
-                  <TableRow key={vs.name}>
+                  <TableRow key={`${vs.namespace}/${vs.name}`}>
                     <TableCell>
                       {hasRoutes && (
                         <Button
@@ -435,7 +435,7 @@ export function IstioResourcesList() {
             </TableHeader>
             <TableBody>
               {gateways.map((gw: IstioGatewayInfo) => (
-                <TableRow key={gw.name}>
+                <TableRow key={`${gw.namespace}/${gw.name}`}>
                   <TableCell className="font-medium">{gw.name}</TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-2">

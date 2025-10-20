@@ -181,7 +181,7 @@ export function SecretsList() {
               ];
 
               return (
-                <ContextMenuTrigger key={secret.name} items={menuItems}>
+                <ContextMenuTrigger key={`${secret.namespace}/${secret.name}`} items={menuItems}>
                   <TableRow>
                     <TableCell className="font-medium">{secret.name}</TableCell>
                     {showNamespaceColumn && <TableCell>{secret.namespace}</TableCell>}
