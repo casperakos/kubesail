@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, memo } from "react";
 import { usePods, useDeletePod, useNamespacePodMetrics } from "../../hooks/useKube";
 import { useAppStore, useSettingsStore } from "../../lib/store";
 import { useToastStore } from "../../lib/toastStore";
@@ -20,7 +20,183 @@ import { ResourceDescribeViewer } from "../../components/ResourceDescribeViewer"
 import { PortForwardModal } from "../../components/PortForwardModal";
 import { ShellTerminal } from "../../components/ShellTerminal";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
-import type { PodMetrics } from "../../types";
+import type { PodMetrics, PodInfo } from "../../types";
+
+// Helper functions for formatting
+const formatBytes = (bytes: number): string => {
+  const gb = bytes / (1024 ** 3);
+  if (gb >= 1) return `${gb.toFixed(1)}GB`;
+  const mb = bytes / (1024 ** 2);
+  if (mb >= 1) return `${mb.toFixed(1)}MB`;
+  return `${(bytes / 1024).toFixed(1)}KB`;
+};
+
+const formatCores = (cores: number): string => {
+  if (cores < 1) return `${Math.round(cores * 1000)}m`;
+  return `${cores.toFixed(2)} cores`;
+};
+
+const getStatusVariant = (status: string) => {
+  switch (status.toLowerCase()) {
+    case "running":
+      return "success";
+    case "pending":
+      return "warning";
+    case "failed":
+    case "error":
+      return "destructive";
+    default:
+      return "secondary";
+  }
+};
+
+// Memoized PodRow component to prevent unnecessary re-renders
+interface PodRowProps {
+  pod: PodInfo;
+  metrics: PodMetrics | null;
+  showNamespaceColumn: boolean;
+  hasAdvancedMetrics: boolean;
+  isSelected: boolean;
+  isDeleting: boolean;
+  onToggleSelection: (podName: string) => void;
+  onDelete: (podName: string) => void;
+  onPortForward: (pod: { name: string; namespace: string; ports: number[] }) => void;
+  onViewYaml: (pod: { name: string; namespace: string }) => void;
+  onDescribe: (pod: { name: string; namespace: string }) => void;
+  onViewLogs: (pod: { name: string; namespace: string }) => void;
+  onShell: (pod: { name: string; namespace: string }) => void;
+}
+
+const PodRow = memo(({
+  pod,
+  metrics,
+  showNamespaceColumn,
+  hasAdvancedMetrics,
+  isSelected,
+  isDeleting,
+  onToggleSelection,
+  onDelete,
+  onPortForward,
+  onViewYaml,
+  onDescribe,
+  onViewLogs,
+  onShell,
+}: PodRowProps) => {
+  // Build context menu items for this pod
+  const menuItems: ContextMenuItem[] = useMemo(() => [
+    ...(pod.ports && pod.ports.length > 0 ? [{
+      label: "Port Forward",
+      icon: <ArrowRightLeft className="w-4 h-4" />,
+      onClick: () => onPortForward({ name: pod.name, namespace: pod.namespace, ports: pod.ports })
+    }] : []),
+    {
+      label: "View YAML",
+      icon: <Code className="w-4 h-4" />,
+      onClick: () => onViewYaml({ name: pod.name, namespace: pod.namespace })
+    },
+    {
+      label: "Describe",
+      icon: <FileText className="w-4 h-4" />,
+      onClick: () => onDescribe({ name: pod.name, namespace: pod.namespace })
+    },
+    {
+      label: "View Logs",
+      icon: <ScrollText className="w-4 h-4" />,
+      onClick: () => onViewLogs({ name: pod.name, namespace: pod.namespace })
+    },
+    {
+      label: "Shell Access",
+      icon: <Terminal className="w-4 h-4" />,
+      onClick: () => onShell({ name: pod.name, namespace: pod.namespace })
+    },
+    { separator: true },
+    {
+      label: "Delete",
+      icon: <Trash2 className="w-4 h-4" />,
+      onClick: () => onDelete(pod.name),
+      variant: "danger" as const,
+      disabled: isDeleting
+    }
+  ], [pod, onPortForward, onViewYaml, onDescribe, onViewLogs, onShell, onDelete, isDeleting]);
+
+  return (
+    <ContextMenuTrigger key={pod.name} items={menuItems}>
+      <TableRow>
+        <TableCell>
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelection(pod.name)}
+            className="w-4 h-4 cursor-pointer"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </TableCell>
+        <TableCell className="font-medium">{pod.name}</TableCell>
+        {showNamespaceColumn && <TableCell>{pod.namespace}</TableCell>}
+        <TableCell>
+          <Badge variant={getStatusVariant(pod.status)}>
+            {pod.status}
+          </Badge>
+        </TableCell>
+        <TableCell>
+          {(() => {
+            const [ready, total] = pod.ready.split("/").map(Number);
+            return (
+              <Badge variant={ready === total ? "success" : "warning"}>
+                {pod.ready}
+              </Badge>
+            );
+          })()}
+        </TableCell>
+        <TableCell>{pod.restarts}</TableCell>
+        {hasAdvancedMetrics && (
+          <>
+            <TableCell>
+              {metrics ? (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium">{metrics.cpu_usage}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatCores(metrics.cpu_usage_cores)}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground">-</span>
+              )}
+            </TableCell>
+            <TableCell>
+              {metrics ? (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium">{metrics.memory_usage}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatBytes(metrics.memory_usage_bytes)}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground">-</span>
+              )}
+            </TableCell>
+          </>
+        )}
+        <TableCell>{pod.age}</TableCell>
+        <TableCell className="text-muted-foreground">
+          {pod.node || "-"}
+        </TableCell>
+        <TableCell className="text-muted-foreground">
+          {pod.ip || "-"}
+        </TableCell>
+        <TableCell className="text-right">
+          <div className="flex items-center justify-end">
+            <ContextMenu items={menuItems}>
+              <MoreVertical className="w-4 h-4" />
+            </ContextMenu>
+          </div>
+        </TableCell>
+      </TableRow>
+    </ContextMenuTrigger>
+  );
+});
+
+PodRow.displayName = "PodRow";
 
 export function PodsList() {
   const currentNamespace = useAppStore((state) => state.currentNamespace);
@@ -40,28 +216,15 @@ export function PodsList() {
   const hasAdvancedMetrics = metricsEnabled && !podMetricsLoading && !podMetricsError && podMetrics && podMetrics.length > 0;
 
   // Helper to get pod metrics by name and namespace
-  const getPodMetrics = (podName: string, namespace: string): PodMetrics | null => {
+  const getPodMetrics = useCallback((podName: string, namespace: string): PodMetrics | null => {
     if (!hasAdvancedMetrics || !podMetrics) return null;
 
     // Find pod metrics by exact name and namespace match
     return podMetrics.find(
       m => m.name === podName && m.namespace === namespace
     ) || null;
-  };
+  }, [hasAdvancedMetrics, podMetrics]);
 
-  // Helper functions for formatting
-  const formatBytes = (bytes: number): string => {
-    const gb = bytes / (1024 ** 3);
-    if (gb >= 1) return `${gb.toFixed(1)}GB`;
-    const mb = bytes / (1024 ** 2);
-    if (mb >= 1) return `${mb.toFixed(1)}MB`;
-    return `${(bytes / 1024).toFixed(1)}KB`;
-  };
-
-  const formatCores = (cores: number): string => {
-    if (cores < 1) return `${Math.round(cores * 1000)}m`;
-    return `${cores.toFixed(2)} cores`;
-  };
   const [selectedPodForLogs, setSelectedPodForLogs] = useState<{name: string; namespace: string} | null>(
     null
   );
@@ -84,19 +247,38 @@ export function PodsList() {
   const [selectedPods, setSelectedPods] = useState<Set<string>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
 
-  const getStatusVariant = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "running":
-        return "success";
-      case "pending":
-        return "warning";
-      case "failed":
-      case "error":
-        return "destructive";
-      default:
-        return "secondary";
-    }
-  };
+  // Memoized handlers for pod actions
+  const handleTogglePodSelection = useCallback((podName: string) => {
+    setSelectedPods(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(podName)) {
+        newSet.delete(podName);
+      } else {
+        newSet.add(podName);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const handlePortForward = useCallback((pod: { name: string; namespace: string; ports: number[] }) => {
+    setSelectedPodForPortForward(pod);
+  }, []);
+
+  const handleViewYaml = useCallback((pod: { name: string; namespace: string }) => {
+    setSelectedPodForYaml(pod);
+  }, []);
+
+  const handleDescribe = useCallback((pod: { name: string; namespace: string }) => {
+    setSelectedPodForDescribe(pod);
+  }, []);
+
+  const handleViewLogs = useCallback((pod: { name: string; namespace: string }) => {
+    setSelectedPodForLogs(pod);
+  }, []);
+
+  const handleShell = useCallback((pod: { name: string; namespace: string }) => {
+    setSelectedPodForShell(pod);
+  }, []);
 
   const handleDelete = (podName: string) => {
     console.log("Delete button clicked for pod:", podName);
@@ -127,18 +309,6 @@ export function PodsList() {
   const cancelDelete = () => {
     console.log("Deletion cancelled");
     setPodToDelete(null);
-  };
-
-  const togglePodSelection = (podName: string) => {
-    setSelectedPods(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(podName)) {
-        newSet.delete(podName);
-      } else {
-        newSet.add(podName);
-      }
-      return newSet;
-    });
   };
 
   const toggleSelectAll = () => {
@@ -363,121 +533,24 @@ export function PodsList() {
               </TableCell>
             </TableRow>
           ) : (
-            filteredPods.map((pod) => {
-              const metrics = getPodMetrics(pod.name, pod.namespace);
-
-              // Build context menu items for this pod
-              const menuItems: ContextMenuItem[] = [
-                ...(pod.ports && pod.ports.length > 0 ? [{
-                  label: "Port Forward",
-                  icon: <ArrowRightLeft className="w-4 h-4" />,
-                  onClick: () => setSelectedPodForPortForward({ name: pod.name, namespace: pod.namespace, ports: pod.ports })
-                }] : []),
-                {
-                  label: "View YAML",
-                  icon: <Code className="w-4 h-4" />,
-                  onClick: () => setSelectedPodForYaml({name: pod.name, namespace: pod.namespace})
-                },
-                {
-                  label: "Describe",
-                  icon: <FileText className="w-4 h-4" />,
-                  onClick: () => setSelectedPodForDescribe({name: pod.name, namespace: pod.namespace})
-                },
-                {
-                  label: "View Logs",
-                  icon: <ScrollText className="w-4 h-4" />,
-                  onClick: () => setSelectedPodForLogs({name: pod.name, namespace: pod.namespace})
-                },
-                {
-                  label: "Shell Access",
-                  icon: <Terminal className="w-4 h-4" />,
-                  onClick: () => setSelectedPodForShell({name: pod.name, namespace: pod.namespace})
-                },
-                { separator: true },
-                {
-                  label: "Delete",
-                  icon: <Trash2 className="w-4 h-4" />,
-                  onClick: () => handleDelete(pod.name),
-                  variant: "danger" as const,
-                  disabled: deletePod.isPending
-                }
-              ];
-
-              return (
-                <ContextMenuTrigger key={pod.name} items={menuItems}>
-                  <TableRow>
-                  <TableCell>
-                    <input
-                      type="checkbox"
-                      checked={selectedPods.has(pod.name)}
-                      onChange={() => togglePodSelection(pod.name)}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium">{pod.name}</TableCell>
-                  {showNamespaceColumn && <TableCell>{pod.namespace}</TableCell>}
-                  <TableCell>
-                    <Badge variant={getStatusVariant(pod.status)}>
-                      {pod.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {(() => {
-                      const [ready, total] = pod.ready.split("/").map(Number);
-                      return (
-                        <Badge variant={ready === total ? "success" : "warning"}>
-                          {pod.ready}
-                        </Badge>
-                      );
-                    })()}
-                  </TableCell>
-                  <TableCell>{pod.restarts}</TableCell>
-                  {hasAdvancedMetrics && (
-                    <>
-                      <TableCell>
-                        {metrics ? (
-                          <div className="flex flex-col gap-1">
-                            <span className="text-xs font-medium">{metrics.cpu_usage}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatCores(metrics.cpu_usage_cores)}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {metrics ? (
-                          <div className="flex flex-col gap-1">
-                            <span className="text-xs font-medium">{metrics.memory_usage}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatBytes(metrics.memory_usage_bytes)}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                    </>
-                  )}
-                  <TableCell>{pod.age}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {pod.node || "-"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {pod.ip || "-"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end">
-                      <ContextMenu items={menuItems}>
-                        <MoreVertical className="w-4 h-4" />
-                      </ContextMenu>
-                    </div>
-                  </TableCell>
-                </TableRow>
-                </ContextMenuTrigger>
-              );
-            })
+            filteredPods.map((pod) => (
+              <PodRow
+                key={pod.name}
+                pod={pod}
+                metrics={getPodMetrics(pod.name, pod.namespace)}
+                showNamespaceColumn={showNamespaceColumn}
+                hasAdvancedMetrics={hasAdvancedMetrics}
+                isSelected={selectedPods.has(pod.name)}
+                isDeleting={deletePod.isPending}
+                onToggleSelection={handleTogglePodSelection}
+                onDelete={handleDelete}
+                onPortForward={handlePortForward}
+                onViewYaml={handleViewYaml}
+                onDescribe={handleDescribe}
+                onViewLogs={handleViewLogs}
+                onShell={handleShell}
+              />
+            ))
           )}
         </TableBody>
       </Table>
