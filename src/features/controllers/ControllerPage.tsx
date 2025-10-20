@@ -867,6 +867,89 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
     setFilteredResources(filtered);
   }, [resourceSearchQuery, resources, sortOrder, dateFilterStart, dateFilterEnd]);
 
+  // Auto-refresh when viewing Workflows with running/pending instances
+  useEffect(() => {
+    // Only auto-refresh for Workflow resources
+    if (!selectedCRD || selectedCRD.kind !== "Workflow") {
+      return;
+    }
+
+    // Check if there are any running or pending workflows
+    const hasActiveWorkflows = resources.some((resource) => {
+      const phase = resource.metadata?.status?.phase?.toLowerCase();
+      return phase === "running" || phase === "pending";
+    });
+
+    if (!hasActiveWorkflows) {
+      return;
+    }
+
+    // Set up auto-refresh interval (5 seconds)
+    const intervalId = setInterval(() => {
+      if (selectedCRD && !resourcesLoading) {
+        loadCustomResources(selectedCRD);
+      }
+    }, 5000);
+
+    // Cleanup interval on unmount or when dependencies change
+    return () => clearInterval(intervalId);
+  }, [selectedCRD, resources, resourcesLoading]);
+
+  // Auto-refresh workflow details when viewing a running/pending workflow
+  useEffect(() => {
+    if (!detailsResource || detailsResource.kind !== "Workflow") {
+      return;
+    }
+
+    const phase = detailsResource.metadata?.status?.phase?.toLowerCase();
+    const isActive = phase === "running" || phase === "pending";
+
+    if (!isActive) {
+      return;
+    }
+
+    // Refresh the specific workflow being viewed (every 3 seconds for real-time updates)
+    const intervalId = setInterval(async () => {
+      if (!selectedCRD || resourcesLoading) return;
+
+      try {
+        const ns =
+          selectedCRD.scope === "Namespaced" && currentNamespace !== "all"
+            ? currentNamespace
+            : null;
+
+        const result = await invoke<CustomResource[]>("get_custom_resources", {
+          group: selectedCRD.group,
+          version: selectedCRD.version,
+          plural: selectedCRD.plural,
+          namespace: ns,
+        });
+
+        // Find and update the specific workflow we're viewing
+        const updatedWorkflow = result.find(
+          (r) => r.name === detailsResource.name && r.namespace === detailsResource.namespace
+        );
+
+        if (updatedWorkflow) {
+          setDetailsResource(updatedWorkflow);
+
+          // Also update the resource in the main list
+          setResources((prev) =>
+            prev.map((r) =>
+              r.name === updatedWorkflow.name && r.namespace === updatedWorkflow.namespace
+                ? updatedWorkflow
+                : r
+            )
+          );
+        }
+      } catch (error) {
+        console.error("Failed to refresh workflow details:", error);
+      }
+    }, 3000);
+
+    return () => clearInterval(intervalId);
+  }, [detailsResource, selectedCRD, currentNamespace, resourcesLoading]);
+
   // Helper function to parse age string to timestamp
   function parseAgeToTimestamp(age: string): number | null {
     if (!age) return null;
