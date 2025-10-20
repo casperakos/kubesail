@@ -1,0 +1,71 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Check TypeScript
+        run: pnpm run build:check
+
+      - name: Check Rust formatting
+        run: cd src-tauri && cargo fmt --all -- --check
+
+      - name: Check Rust code
+        run: cd src-tauri && cargo check
+
+      - name: Run Rust clippy
+        run: cd src-tauri && cargo clippy -- -D warnings
+
+      - name: Run Rust tests
+        run: cd src-tauri && cargo test
+
+      - name: Build frontend
+        run: pnpm build
+
+      - name: Build Tauri (Debug)
+        run: cd src-tauri && cargo build
