@@ -867,7 +867,7 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
     setFilteredResources(filtered);
   }, [resourceSearchQuery, resources, sortOrder, dateFilterStart, dateFilterEnd]);
 
-  // Auto-refresh when viewing Workflows with running/pending instances
+  // Auto-refresh when viewing Workflows
   useEffect(() => {
     // Only auto-refresh for Workflow resources
     if (!selectedCRD || selectedCRD.kind !== "Workflow") {
@@ -880,16 +880,16 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
       return phase === "running" || phase === "pending";
     });
 
-    if (!hasActiveWorkflows) {
-      return;
-    }
+    // Use faster refresh (5s) for active workflows, slower (15s) for completed workflows
+    // This ensures new workflows appear even when all current ones are completed
+    const refreshInterval = hasActiveWorkflows ? 5000 : 15000;
 
-    // Set up auto-refresh interval (5 seconds)
+    // Set up auto-refresh interval
     const intervalId = setInterval(() => {
       if (selectedCRD && !resourcesLoading) {
         loadCustomResources(selectedCRD);
       }
-    }, 5000);
+    }, refreshInterval);
 
     // Cleanup interval on unmount or when dependencies change
     return () => clearInterval(intervalId);
