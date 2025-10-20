@@ -884,10 +884,10 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
     // This ensures new workflows appear even when all current ones are completed
     const refreshInterval = hasActiveWorkflows ? 5000 : 15000;
 
-    // Set up auto-refresh interval
+    // Set up auto-refresh interval (silent mode to avoid loading spinner)
     const intervalId = setInterval(() => {
       if (selectedCRD && !resourcesLoading) {
-        loadCustomResources(selectedCRD);
+        loadCustomResources(selectedCRD, true); // silent = true
       }
     }, refreshInterval);
 
@@ -1013,11 +1013,13 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
     }
   }
 
-  async function loadCustomResources(crd: CRD) {
+  async function loadCustomResources(crd: CRD, silent = false) {
     setSelectedCRD(crd);
-    setResourcesLoading(true);
-    setResourcesError(null);
-    setResourceSearchQuery("");
+    if (!silent) {
+      setResourcesLoading(true);
+      setResourcesError(null);
+      setResourceSearchQuery("");
+    }
 
     try {
       const ns =
@@ -1033,17 +1035,23 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
       });
 
       // Debug: log the first resource to see its structure
-      if (result.length > 0) {
+      if (result.length > 0 && !silent) {
         console.log("Sample resource structure:", result[0]);
         console.log("Resource keys:", Object.keys(result[0]));
       }
 
       setResources(result);
-      setFilteredResources(result);
+      // Note: filteredResources will be updated by the useEffect that watches resources
     } catch (err) {
-      setResourcesError(String(err));
+      if (!silent) {
+        setResourcesError(String(err));
+      } else {
+        console.error("Silent refresh failed:", err);
+      }
     } finally {
-      setResourcesLoading(false);
+      if (!silent) {
+        setResourcesLoading(false);
+      }
     }
   }
 
