@@ -186,6 +186,19 @@ export function Sidebar() {
     }
   }, [sidebarCollapsed]);
 
+  // Keyboard shortcut to toggle sidebar (Cmd+B or Ctrl+B)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+        e.preventDefault();
+        setSidebarCollapsed(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Load collapsed sections state from localStorage
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
     try {
@@ -271,7 +284,7 @@ export function Sidebar() {
             "p-2 rounded-lg hover:bg-accent/60 transition-all duration-200 absolute",
             sidebarCollapsed ? "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" : "top-4 right-4"
           )}
-          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={sidebarCollapsed ? "Expand sidebar (⌘B)" : "Collapse sidebar (⌘B)"}
         >
           {sidebarCollapsed ? (
             <PanelLeft className="w-5 h-5 text-muted-foreground" />
