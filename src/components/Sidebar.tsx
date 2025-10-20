@@ -30,7 +30,10 @@ import {
   CalendarClock,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   WifiOff,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
 import { ResourceType } from "../types";
 import { Logo } from "./Logo";
@@ -164,7 +167,26 @@ export function Sidebar() {
     ? ["Overview", "Quick Access", "Workloads"]
     : ["Overview", "Workloads"];
 
-  // Load collapsed state from localStorage
+  // Load sidebar collapsed state from localStorage
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      const saved = localStorage.getItem("sidebar-collapsed");
+      return saved === "true";
+    } catch (e) {
+      return false;
+    }
+  });
+
+  // Save sidebar collapsed state
+  useEffect(() => {
+    try {
+      localStorage.setItem("sidebar-collapsed", String(sidebarCollapsed));
+    } catch (e) {
+      console.error("Failed to save sidebar collapsed state:", e);
+    }
+  }, [sidebarCollapsed]);
+
+  // Load collapsed sections state from localStorage
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem("sidebar-collapsed-sections");
@@ -236,10 +258,27 @@ export function Sidebar() {
   ];
 
   return (
-    <div className="w-64 border-r bg-gradient-to-b from-card to-card/50 h-screen flex flex-col shadow-xl">
-      {/* Logo Section with gradient background */}
-      <div className="p-6 bg-gradient-to-br from-background/50 to-background/30 backdrop-blur-sm">
-        <Logo />
+    <div className={cn(
+      "border-r bg-gradient-to-b from-card to-card/50 h-screen flex flex-col shadow-xl transition-all duration-300",
+      sidebarCollapsed ? "w-20" : "w-64"
+    )}>
+      {/* Logo Section with gradient background and toggle */}
+      <div className="p-6 bg-gradient-to-br from-background/50 to-background/30 backdrop-blur-sm relative">
+        {!sidebarCollapsed && <Logo />}
+        <button
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          className={cn(
+            "p-2 rounded-lg hover:bg-accent/60 transition-all duration-200 absolute",
+            sidebarCollapsed ? "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" : "top-4 right-4"
+          )}
+          title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {sidebarCollapsed ? (
+            <PanelLeft className="w-5 h-5 text-muted-foreground" />
+          ) : (
+            <PanelLeftClose className="w-5 h-5 text-muted-foreground" />
+          )}
+        </button>
       </div>
 
       {/* Navigation */}
@@ -250,31 +289,36 @@ export function Sidebar() {
 
           return (
             <div key={section.title} className="space-y-2">
-              {/* Section Header - Clickable */}
-              <button
-                onClick={() => toggleSection(section.title)}
-                className={cn(
-                  "w-full flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest px-2 py-1.5 rounded-md transition-all duration-200",
-                  "hover:bg-accent/40",
-                  isCollapsed
-                    ? "text-muted-foreground/60"
-                    : "text-muted-foreground/80"
-                )}
-              >
-                {isCollapsed ? (
-                  <ChevronRight className="w-3 h-3 opacity-40" />
-                ) : (
-                  <ChevronDown className="w-3 h-3 opacity-40" />
-                )}
-                <span className="flex-1 text-left">{section.title}</span>
-                {isCollapsed && hasActiveItem && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-lg shadow-primary/50" />
-                )}
-              </button>
+              {/* Section Header - Clickable (hidden when sidebar collapsed) */}
+              {!sidebarCollapsed && (
+                <button
+                  onClick={() => toggleSection(section.title)}
+                  className={cn(
+                    "w-full flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest px-2 py-1.5 rounded-md transition-all duration-200",
+                    "hover:bg-accent/40",
+                    isCollapsed
+                      ? "text-muted-foreground/60"
+                      : "text-muted-foreground/80"
+                  )}
+                >
+                  {isCollapsed ? (
+                    <ChevronRight className="w-3 h-3 opacity-40" />
+                  ) : (
+                    <ChevronDown className="w-3 h-3 opacity-40" />
+                  )}
+                  <span className="flex-1 text-left">{section.title}</span>
+                  {isCollapsed && hasActiveItem && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-lg shadow-primary/50" />
+                  )}
+                </button>
+              )}
 
               {/* Section Items - Collapsible */}
-              {!isCollapsed && (
-                <div className="space-y-1 ml-2 transition-all duration-200">
+              {(!isCollapsed || sidebarCollapsed) && (
+                <div className={cn(
+                  "space-y-1 transition-all duration-200",
+                  sidebarCollapsed ? "ml-0" : "ml-2"
+                )}>
                   {section.items.map((item) => {
                     const Icon = item.icon;
                     const isActive = currentView === item.view;
@@ -284,14 +328,16 @@ export function Sidebar() {
                         key={item.view}
                         onClick={() => setCurrentView(item.view)}
                         className={cn(
-                          "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200 group relative overflow-hidden",
+                          "w-full flex items-center gap-2.5 rounded-lg text-[13px] font-medium transition-all duration-200 group relative overflow-hidden",
+                          sidebarCollapsed ? "px-2 py-2 justify-center" : "px-3 py-2",
                           isActive
                             ? "bg-primary/15 text-foreground shadow-sm border border-primary/30 font-semibold"
                             : "hover:bg-accent/60 text-muted-foreground hover:text-foreground"
                         )}
+                        title={sidebarCollapsed ? item.label : undefined}
                       >
                         {/* Active indicator bar */}
-                        {isActive && (
+                        {isActive && !sidebarCollapsed && (
                           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-r-full shadow-lg shadow-primary/40" />
                         )}
 
@@ -303,7 +349,10 @@ export function Sidebar() {
                           <Icon className="w-[17px] h-[17px]" strokeWidth={isActive ? 2.5 : 2} />
                         </div>
 
-                        <span className="relative z-10 flex-1 text-left">{item.label}</span>
+                        {/* Label (hidden when sidebar collapsed) */}
+                        {!sidebarCollapsed && (
+                          <span className="relative z-10 flex-1 text-left">{item.label}</span>
+                        )}
 
                         {/* Hover effect */}
                         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg" />
@@ -323,40 +372,62 @@ export function Sidebar() {
         {activePortForwardsCount > 0 && (
           <button
             onClick={() => setCurrentView('portforwards')}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/30 transition-all duration-200 group"
+            className={cn(
+              "w-full flex items-center rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/30 transition-all duration-200 group",
+              sidebarCollapsed ? "gap-0 px-2 py-2 justify-center" : "gap-2 px-3 py-2"
+            )}
+            title={sidebarCollapsed ? `${activePortForwardsCount} active port forwards` : undefined}
           >
             <ArrowRightLeft className="w-4 h-4 text-primary" />
-            <span className="text-xs font-medium text-foreground flex-1 text-left">
-              Port Forwards
-            </span>
-            <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4 bg-primary">
-              {activePortForwardsCount}
-            </Badge>
+            {!sidebarCollapsed && (
+              <>
+                <span className="text-xs font-medium text-foreground flex-1 text-left">
+                  Port Forwards
+                </span>
+                <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4 bg-primary">
+                  {activePortForwardsCount}
+                </Badge>
+              </>
+            )}
+            {sidebarCollapsed && (
+              <Badge variant="default" className="absolute -top-1 -right-1 text-[9px] px-1 py-0 h-3.5 min-w-3.5 bg-primary flex items-center justify-center">
+                {activePortForwardsCount}
+              </Badge>
+            )}
           </button>
         )}
 
         {/* Connection Status */}
-        <div className="flex items-center gap-2 text-xs">
+        <div className={cn(
+          "flex items-center text-xs",
+          sidebarCollapsed ? "justify-center" : "gap-2"
+        )}>
           {isConnected ? (
             <>
               <div className="relative">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                 <div className="absolute inset-0 w-2 h-2 rounded-full bg-green-500 animate-ping opacity-75"></div>
               </div>
-              <span className="font-medium text-foreground/80">Connected</span>
+              {!sidebarCollapsed && (
+                <span className="font-medium text-foreground/80">Connected</span>
+              )}
             </>
           ) : (
             <>
               <WifiOff className="w-3 h-3 text-red-500" />
-              <span className="font-medium text-red-500/80">Disconnected</span>
+              {!sidebarCollapsed && (
+                <span className="font-medium text-red-500/80">Disconnected</span>
+              )}
             </>
           )}
         </div>
 
-        {/* Version */}
-        <div className="text-[10px] text-muted-foreground">
-          v2.0.0 • {new Date().getFullYear()}
-        </div>
+        {/* Version (hidden when collapsed) */}
+        {!sidebarCollapsed && (
+          <div className="text-[10px] text-muted-foreground">
+            v2.0.0 • {new Date().getFullYear()}
+          </div>
+        )}
       </div>
     </div>
   );
