@@ -525,7 +525,7 @@ export function PodsList() {
       </div>
 
       <Table>
-        <TableHeader className="sticky top-0 z-10 bg-background">
+        <TableHeader>
           <TableRow>
             <TableHead className="w-12"></TableHead>
             <TableHead>Name</TableHead>
