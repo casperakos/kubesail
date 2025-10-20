@@ -293,9 +293,11 @@ export function CRDsList() {
 
         <div className="mt-4 text-sm text-muted-foreground">
           Showing {filteredResources.length} of {resources.length} resources
-          {selectedCRD.scope === "Namespaced" &&
-            currentNamespace !== "all" &&
-            ` in namespace "${currentNamespace}"`}
+          {selectedCRD.scope === "Namespaced" && (
+            currentNamespace && currentNamespace !== "all"
+              ? ` in namespace "${currentNamespace}"`
+              : ` across all namespaces`
+          )}
         </div>
 
         {/* Describe Modal */}
