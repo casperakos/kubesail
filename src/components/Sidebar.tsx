@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { useAppStore } from "../lib/store";
 import { cn } from "../lib/utils";
 import {
@@ -149,6 +150,7 @@ export function Sidebar() {
   const { data: controllers = [] } = useControllerDetection();
   const { data: namespaces, isError, isFetching, isSuccess } = useNamespaces();
   const { data: portForwards } = usePortForwards();
+  const [appVersion, setAppVersion] = useState<string>("");
 
   // Determine connection status - check if we have successful data or currently fetching
   // If isError is true and we're not fetching, then we're disconnected
@@ -185,6 +187,11 @@ export function Sidebar() {
       console.error("Failed to save sidebar collapsed state:", e);
     }
   }, [sidebarCollapsed]);
+
+  // Fetch app version
+  useEffect(() => {
+    getVersion().then(version => setAppVersion(version)).catch(() => setAppVersion("0.1.0"));
+  }, []);
 
   // Keyboard shortcut to toggle sidebar (Cmd+B or Ctrl+B)
   useEffect(() => {
@@ -436,9 +443,9 @@ export function Sidebar() {
         </div>
 
         {/* Version (hidden when collapsed) */}
-        {!sidebarCollapsed && (
+        {!sidebarCollapsed && appVersion && (
           <div className="text-[10px] text-muted-foreground">
-            v2.0.0 • {new Date().getFullYear()}
+            v{appVersion} • {new Date().getFullYear()}
           </div>
         )}
       </div>
