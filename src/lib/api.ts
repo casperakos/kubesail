@@ -28,6 +28,14 @@ import type {
   MetricsCapabilities,
   ClusterMetricsData,
   CNPGConnectionDetails,
+  DbConnectionInfo,
+  DbDatabase,
+  DbSchema,
+  DbTable,
+  DbColumn,
+  QueryResult,
+  QueryRequest,
+  TableDataRequest,
 } from "../types";
 
 export const api = {
@@ -513,5 +521,74 @@ export const api = {
   // CloudNativePG operations
   async getCNPGClusterConnection(clusterName: string, namespace: string): Promise<CNPGConnectionDetails> {
     return await invoke("get_cnpg_cluster_connection", { clusterName, namespace });
+  },
+
+  // Database Editor operations
+  async dbConnect(
+    clusterName: string,
+    namespace: string,
+    database: string,
+    username: string,
+    password: string
+  ): Promise<DbConnectionInfo> {
+    return await invoke("db_connect", {
+      clusterName,
+      namespace,
+      database,
+      username,
+      password,
+    });
+  },
+
+  async dbDisconnect(connectionId: string): Promise<void> {
+    return await invoke("db_disconnect", { connectionId });
+  },
+
+  async dbListConnections(): Promise<DbConnectionInfo[]> {
+    return await invoke("db_list_connections");
+  },
+
+  async dbListDatabases(connectionId: string): Promise<DbDatabase[]> {
+    return await invoke("db_list_databases", { connectionId });
+  },
+
+  async dbListSchemas(connectionId: string): Promise<DbSchema[]> {
+    return await invoke("db_list_schemas", { connectionId });
+  },
+
+  async dbListTables(connectionId: string, schema: string): Promise<DbTable[]> {
+    return await invoke("db_list_tables", { connectionId, schema });
+  },
+
+  async dbGetTableColumns(
+    connectionId: string,
+    schema: string,
+    table: string
+  ): Promise<DbColumn[]> {
+    return await invoke("db_get_table_columns", {
+      connectionId,
+      schema,
+      table,
+    });
+  },
+
+  async dbGetTableData(request: TableDataRequest): Promise<QueryResult> {
+    return await invoke("db_get_table_data", { request });
+  },
+
+  async dbExecuteQuery(request: QueryRequest): Promise<QueryResult> {
+    return await invoke("db_execute_query", { request });
+  },
+
+  async dbHealthCheck(connectionId: string): Promise<boolean> {
+    return await invoke("db_health_check", { connectionId });
+  },
+
+  async dbCurrentDatabase(connectionId: string): Promise<string> {
+    return await invoke("db_current_database", { connectionId });
+  },
+
+  async dbVersion(connectionId: string): Promise<string> {
+    return await invoke("db_version", { connectionId });
   },
 };

@@ -257,6 +257,7 @@ export type ResourceType =
   | "argo-workflows"
   | "argo-workflows-workflows"
   | "argo-events"
+  | "cloudnativepg"
   | "settings";
 
 // RBAC Types
@@ -490,4 +491,60 @@ export interface CNPGConnectionDetails {
   jdbc_uri: string;
   fqdn_jdbc_uri: string;
   pgpass: string;
+}
+
+// Database Editor Types
+export interface DbConnectionInfo {
+  connection_id: string;
+  cluster_name: string;
+  namespace: string;
+  database: string;
+  local_port: number;
+}
+
+export interface DbDatabase {
+  name: string;
+  size: string | null;
+}
+
+export interface DbSchema {
+  name: string;
+  owner: string | null;
+}
+
+export interface DbTable {
+  schema: string;
+  name: string;
+  table_type: string;
+  row_count: number | null;
+}
+
+export interface DbColumn {
+  name: string;
+  data_type: string;
+  is_nullable: boolean;
+  column_default: string | null;
+  character_maximum_length: number | null;
+  is_primary_key: boolean;
+}
+
+export interface QueryResult {
+  columns: DbColumn[];
+  rows: Record<string, any>[];
+  row_count: number;
+  execution_time_ms: number;
+}
+
+export interface QueryRequest {
+  connection_id: string;
+  query: string;
+  params?: any[];
+}
+
+export interface TableDataRequest {
+  connection_id: string;
+  schema: string;
+  table: string;
+  limit?: number;
+  offset?: number;
 }

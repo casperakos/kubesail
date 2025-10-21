@@ -1,4 +1,5 @@
 mod commands;
+mod database;
 mod helm;
 mod kube;
 mod metrics;
@@ -6,9 +7,13 @@ mod portforward;
 mod shell;
 mod types;
 
+use database::ConnectionManager;
 use kube::KubeClientManager;
 use portforward::PortForwardManager;
 use shell::ShellManager;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 /// Set up PATH environment variable to include common locations for kubectl and its plugins
 fn setup_path_env() {
@@ -68,6 +73,7 @@ pub fn run() {
     let client_manager = KubeClientManager::new();
     let portforward_manager = PortForwardManager::new();
     let shell_manager = ShellManager::new();
+    let connection_manager: ConnectionManager = Arc::new(RwLock::new(HashMap::new()));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -77,6 +83,7 @@ pub fn run() {
         .manage(client_manager)
         .manage(portforward_manager)
         .manage(shell_manager)
+        .manage(connection_manager)
         .invoke_handler(tauri::generate_handler![
             commands::get_kubeconfig_contexts,
             commands::get_clusters,
@@ -160,6 +167,18 @@ pub fn run() {
             commands::get_cluster_metrics_data,
             commands::get_namespace_pod_metrics,
             commands::get_cnpg_cluster_connection,
+            commands::db_connect,
+            commands::db_disconnect,
+            commands::db_list_connections,
+            commands::db_list_databases,
+            commands::db_list_schemas,
+            commands::db_list_tables,
+            commands::db_get_table_columns,
+            commands::db_get_table_data,
+            commands::db_execute_query,
+            commands::db_health_check,
+            commands::db_current_database,
+            commands::db_version,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

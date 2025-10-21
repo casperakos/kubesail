@@ -1,7 +1,11 @@
+pub mod database;
+
 use crate::kube::{get_current_context, load_kubeconfig, KubeClientManager};
 use crate::shell::ShellManager;
 use crate::types::*;
 use tauri::{AppHandle, State};
+
+pub use database::*;
 
 #[tauri::command]
 pub async fn get_kubeconfig_contexts(

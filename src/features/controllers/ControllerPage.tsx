@@ -37,7 +37,8 @@ import {
   Hash,
   ChevronDown,
   ChevronRight,
-  MoreVertical
+  MoreVertical,
+  Database
 } from "lucide-react";
 import { ContextMenu, ContextMenuItem, ContextMenuTrigger } from "../../components/ui/ContextMenu";
 import { useAppStore } from "../../lib/store";
@@ -47,6 +48,7 @@ import { CustomResourceYamlViewer } from "../../components/CustomResourceYamlVie
 import { WorkflowDAGViewer } from "../../components/WorkflowDAGViewer";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
 import { ClusterConnectionDetails } from "../cloudnativepg/ClusterConnectionDetails";
+import { DatabaseEditorModal } from "../database/DatabaseEditorModal";
 
 interface CRD {
   name: string;
@@ -739,6 +741,7 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
   const [yamlResource, setYamlResource] = useState<CustomResource | null>(null);
   const [detailsResource, setDetailsResource] = useState<CustomResource | null>(null);
   const [workflowViewMode, setWorkflowViewMode] = useState<"details" | "dag" | "all-logs">("details");
+  const [databaseEditorCluster, setDatabaseEditorCluster] = useState<{ name: string; namespace: string } | null>(null);
 
   // For tracking syncing operations
   const [syncingResources, setSyncingResources] = useState<Set<string>>(new Set());
@@ -1436,6 +1439,19 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
 
                     // Build context menu items
                     const menuItems: ContextMenuItem[] = [
+                      // Connect to Database (CNPG Clusters only)
+                      ...(isCNPGCluster ? [{
+                        label: "Connect to Database",
+                        icon: <Database className="w-4 h-4" />,
+                        onClick: () => {
+                          setDatabaseEditorCluster({
+                            name: resource.name,
+                            namespace: resource.namespace || ""
+                          });
+                        }
+                      }] : []),
+                      // Separator after CNPG-specific actions
+                      ...(isCNPGCluster ? [{ separator: true }] : []),
                       // View Details (for ArgoCD, Argo Workflows, Argo Events)
                       ...((controllerId === "argocd" || controllerId === "argo-workflows" || controllerId === "argo-events") ? [{
                         label: "View Details",
@@ -1843,6 +1859,15 @@ export function ControllerPage({ controllerId, defaultCRDKind }: ControllerPageP
             resourceName={yamlResource.name}
             namespace={yamlResource.namespace || undefined}
             onClose={() => setYamlResource(null)}
+          />
+        )}
+
+        {/* Database Editor Modal */}
+        {databaseEditorCluster && (
+          <DatabaseEditorModal
+            clusterName={databaseEditorCluster.name}
+            namespace={databaseEditorCluster.namespace}
+            onClose={() => setDatabaseEditorCluster(null)}
           />
         )}
 
