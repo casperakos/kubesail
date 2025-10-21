@@ -2897,6 +2897,88 @@ pub async fn get_cnpg_cluster_connection(
         namespace
     );
 
+    let secrets: Api<Secret> = Api::namespaced(client.clone(), namespace);
+
+    // Helper function to decode secret data
+    let decode_secret_data = |secret: &Secret, key: &str| -> Result<String> {
+        let data = secret.data.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Secret has no data field"))?;
+
+        let bytes = data.get(key)
+            .ok_or_else(|| anyhow::anyhow!("Secret key '{}' not found", key))?;
+
+        String::from_utf8(bytes.0.clone())
+            .map_err(|e| anyhow::anyhow!("UTF8 conversion failed for key '{}': {}", key, e))
+    };
+
+    // ROBUST APPROACH: Try CloudNativePG's auto-generated -app secret first
+    // This secret contains ALL connection details pre-formatted
+    let app_secret_name = format!("{}-app", cluster_name);
+    tracing::info!("Attempting to fetch CloudNativePG auto-generated secret: {}", app_secret_name);
+
+    if let Ok(app_secret) = secrets.get(&app_secret_name).await {
+        tracing::info!("Found -app secret, checking if it has all required fields...");
+
+        // Check if this secret has all the comprehensive connection details
+        if let Some(data) = &app_secret.data {
+            let has_comprehensive_data = data.contains_key("host")
+                && data.contains_key("port")
+                && data.contains_key("dbname")
+                && data.contains_key("username")
+                && data.contains_key("password")
+                && data.contains_key("uri");
+
+            if has_comprehensive_data {
+                tracing::info!("-app secret has comprehensive connection details, using it directly");
+
+                // Extract all fields from the -app secret
+                let host = decode_secret_data(&app_secret, "host")?;
+                let port = decode_secret_data(&app_secret, "port")?;
+                let database = decode_secret_data(&app_secret, "dbname")?;
+                let username = decode_secret_data(&app_secret, "username")
+                    .or_else(|_| decode_secret_data(&app_secret, "user"))?; // Try both username and user
+                let password = decode_secret_data(&app_secret, "password")?;
+                let uri = decode_secret_data(&app_secret, "uri")?;
+                let fqdn_uri = decode_secret_data(&app_secret, "fqdn-uri")
+                    .unwrap_or_else(|_| format!(
+                        "postgresql://{}:{}@{}-rw.{}.svc.cluster.local:{}/{}",
+                        username, password, cluster_name, namespace, port, database
+                    ));
+                let jdbc_uri = decode_secret_data(&app_secret, "jdbc-uri")
+                    .unwrap_or_else(|_| format!("jdbc:postgresql://{}:{}/{}", host, port, database));
+                let fqdn_jdbc_uri = decode_secret_data(&app_secret, "fqdn-jdbc-uri")
+                    .unwrap_or_else(|_| format!(
+                        "jdbc:postgresql://{}-rw.{}.svc.cluster.local:{}/{}",
+                        cluster_name, namespace, port, database
+                    ));
+                let pgpass = decode_secret_data(&app_secret, "pgpass")
+                    .unwrap_or_else(|_| format!("{}:{}:{}:{}:{}", host, port, database, username, password));
+
+                tracing::info!("Successfully extracted all connection details from -app secret");
+
+                return Ok(CNPGConnectionDetails {
+                    cluster_name: cluster_name.to_string(),
+                    namespace: namespace.to_string(),
+                    database,
+                    username,
+                    password,
+                    host,
+                    port,
+                    uri,
+                    fqdn_uri,
+                    jdbc_uri,
+                    fqdn_jdbc_uri,
+                    pgpass,
+                });
+            } else {
+                tracing::warn!("-app secret exists but doesn't have comprehensive data, falling back to manual construction");
+            }
+        }
+    } else {
+        tracing::info!("-app secret not found, falling back to cluster spec approach");
+    }
+
+    // FALLBACK: Manual construction from cluster spec + separate secret
     // Get the Cluster resource to extract database name and other config
     let clusters: Api<DynamicObject> = Api::namespaced_with(
         client.clone(),
@@ -2918,7 +3000,6 @@ pub async fn get_cnpg_cluster_connection(
     tracing::info!("Successfully fetched Cluster resource");
 
     let cluster_data: Value = serde_json::to_value(&cluster.data)?;
-    tracing::debug!("Cluster data: {}", serde_json::to_string_pretty(&cluster_data).unwrap_or_else(|_| "Unable to serialize".to_string()));
 
     // Extract database configuration from cluster spec
     let database = cluster_data["spec"]["bootstrap"]["initdb"]["database"]
@@ -2931,70 +3012,56 @@ pub async fn get_cnpg_cluster_connection(
         .unwrap_or("app")
         .to_string();
 
-    let secret_name = cluster_data["spec"]["bootstrap"]["initdb"]["secret"]["name"]
+    // Try multiple secret name patterns
+    let configured_secret = cluster_data["spec"]["bootstrap"]["initdb"]["secret"]["name"]
         .as_str()
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| format!("{}-appuser", cluster_name));
+        .map(|s| s.to_string());
 
-    tracing::info!(
-        "Extracted from cluster spec - database: {}, username: {}, secret_name: {}",
-        database,
-        username,
-        secret_name
-    );
-
-    // Get the secret containing the password
-    let secrets: Api<Secret> = Api::namespaced(client, namespace);
-    tracing::debug!("Attempting to fetch secret: {}", secret_name);
-    let secret = secrets.get(&secret_name).await.map_err(|e| {
-        tracing::error!("Failed to fetch secret '{}': {}", secret_name, e);
-        e
-    })?;
-    tracing::info!("Successfully fetched secret: {}", secret_name);
-
-    // Log secret data keys
-    if let Some(data) = &secret.data {
-        let keys: Vec<_> = data.keys().collect();
-        tracing::info!("Secret contains keys: {:?}", keys);
+    let secret_candidates = if let Some(configured) = configured_secret {
+        vec![
+            configured.clone(),
+            format!("{}-app", cluster_name),
+            format!("{}-appuser", cluster_name),
+            format!("{}-superuser", cluster_name),
+        ]
     } else {
-        tracing::warn!("Secret has no data field!");
-    }
-
-    // Helper function to extract secret data
-    // Note: kube-rs automatically base64-decodes the secret data,
-    // so we just need to convert ByteString to String
-    let decode_secret_data = |key: &str| -> Result<String> {
-        let data = secret.data.as_ref()
-            .ok_or_else(|| anyhow::anyhow!("Secret has no data field"))?;
-
-        let bytes = data.get(key)
-            .ok_or_else(|| anyhow::anyhow!("Secret key '{}' not found", key))?;
-
-        tracing::debug!("Raw ByteString for key '{}' has {} bytes", key, bytes.0.len());
-
-        // ByteString is already decoded by kube-rs - just convert to UTF-8 string
-        String::from_utf8(bytes.0.clone())
-            .map_err(|e| anyhow::anyhow!("UTF8 conversion failed for key '{}': {}", key, e))
+        vec![
+            format!("{}-app", cluster_name),
+            format!("{}-appuser", cluster_name),
+            format!("{}-superuser", cluster_name),
+        ]
     };
 
-    tracing::debug!("Attempting to decode password from secret");
-    let password = decode_secret_data("password").map_err(|e| {
-        tracing::error!("Failed to decode password: {}", e);
-        e
+    tracing::info!("Trying secret candidates: {:?}", secret_candidates);
+
+    let mut secret = None;
+    let mut used_secret_name = String::new();
+
+    for candidate in secret_candidates {
+        tracing::debug!("Attempting to fetch secret: {}", candidate);
+        match secrets.get(&candidate).await {
+            Ok(s) => {
+                tracing::info!("Found secret: {}", candidate);
+                used_secret_name = candidate;
+                secret = Some(s);
+                break;
+            }
+            Err(e) => {
+                tracing::debug!("Secret '{}' not found: {}", candidate, e);
+            }
+        }
+    }
+
+    let secret = secret.ok_or_else(|| {
+        anyhow::anyhow!("Could not find any suitable secret for cluster {}", cluster_name)
     })?;
-    tracing::info!("Successfully decoded password");
+
+    let password = decode_secret_data(&secret, "password")?;
 
     // CloudNativePG standard service names
-    let host = format!("{}-rw", cluster_name); // Read-write service
+    let host = format!("{}-rw", cluster_name);
     let port = "5432".to_string();
     let fqdn_host = format!("{}-rw.{}.svc.cluster.local", cluster_name, namespace);
-
-    tracing::info!(
-        "Constructing connection strings - host: {}, port: {}, fqdn_host: {}",
-        host,
-        port,
-        fqdn_host
-    );
 
     // Construct connection strings
     let uri = format!(
@@ -3022,7 +3089,7 @@ pub async fn get_cnpg_cluster_connection(
         host, port, database, username, password
     );
 
-    tracing::info!("Successfully built CNPG connection details");
+    tracing::info!("Successfully built CNPG connection details from cluster spec and secret '{}'", used_secret_name);
 
     Ok(CNPGConnectionDetails {
         cluster_name: cluster_name.to_string(),
